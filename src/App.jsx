@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Trash2, Dumbbell, UtensilsCrossed, Scale, ChevronDown, ChevronUp, Search, X, ChevronLeft, ChevronRight, Trophy, History, Check, ScanBarcode, Camera, Library, Pencil, Play, ArrowLeft, User, Users, LayoutDashboard, PersonStanding } from "lucide-react";
+import { Plus, Trash2, Dumbbell, UtensilsCrossed, Scale, ChevronDown, ChevronUp, Search, X, ChevronLeft, ChevronRight, Trophy, History, Check, ScanBarcode, Library, Pencil, ArrowLeft, LayoutDashboard, PersonStanding } from "lucide-react";
 
 // ---- Embedded plan library + muscle map ----
 const ASSETS = {"BUILTIN_PLANS":[{"id":"builtin-nippard","name":"Jeff Nippard High Frequency Full Body","createdBy":"builtin","builtin":true,"structure":"weeks","weeks":[{"wk":1,"blk":1,"days":[{"d":1,"focus":"LOWER FOCUSED FULL BODY","ex":[{"n":"BACK SQUAT","ws":"4","r":"4","rpe":"77.5%","rest":"2-4 MIN","note":"SIT BACK AND DOWN, 15\u00b0 TOE FLARE, DRIVE YOUR KNEES OUT LATERALLY","mz":{"quads":1.0,"glutes":1.0,"hamstrings":0.5}},{"n":"DUMBBELL INCLINE PRESS","ws":"3","r":"8","rpe":"RPE8","rest":"2-3 MIN","note":"~45 DEGREE INCLINE, MIND MUSCLE CONNECTION WITH UPPER PECS","mz":{"chest":1.0,"shoulders":0.5,"triceps":0.5}},{"n":"LYING LEG CURL","ws":"3","r":"10","rpe":"RPE6","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR HAMSTRINGS TO MOVE THE WEIGHT","mz":{"hamstrings":1.0}},{"n":"PRONATED PULLDOWN","ws":"3","r":"10","rpe":"RPE7","rest":"2-3 MIN","note":"PULL YOUR ELBOWS DOWN AND IN","mz":{"back":1.0,"biceps":0.5}},{"n":"SUPINATED EZ BAR CURL","ws":"3","r":"15/15","rpe":"RPE9","rest":"1-2 MIN","note":"DROPSET. DROP WEIGHT BY ~50% ON SECOND 15 REPS. 30 REPS TOTAL.","mz":{"biceps":1.0}},{"n":"HANGING LEG RAISE","ws":"3","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"ROLL HIPS \"UP\" AS YOU SQUEEZE LOWER ABS, AVOID SWINGING","mz":{"abs":1.0}}]},{"d":2,"focus":"CHEST FOCUSED FULL BODY","ex":[{"n":"BARBELL BENCH PRESS","ws":"3","r":"3","rpe":"85%","rest":"2-4 MIN","note":"SET UP A COMFORTABLE ARCH, 1-2 SECOND PAUSE ON CHEST, EXPLODE OFF CHEST WITH MAX FORCE","mz":{"chest":1.0,"triceps":0.5,"shoulders":0.5}},{"n":"LOW TO HIGH CABLE FLYE","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"START WITH YOUR HANDS OUT TO YOUR SIDES AND PALMS FACING THE CEILING, FOCUS ON PULLING YOUR ELBOWS UP AND IN WHILE ROTATING YOUR PALMS TO FACE THE FLOOR","mz":{"chest":1.0}},{"n":"BARBELL HIP THRUST OR ROMANIAN DEADLIFT","ws":"3","r":"12","rpe":"RPE6","rest":"2-3 MIN","note":"HIP THRUST IF GLUTES ARE PRIORITY, RDL IF HAMSTRINGS ARE PRIORITY FOR YOU. FOCUS ON MIND MUSCLE CONNECTION.","mz":{"glutes":1.0,"hamstrings":1.0}},{"n":"CHEST-SUPPORTED T-BAR ROW","ws":"3","r":"15","rpe":"RPE6","rest":"1-3 MIN","note":"SQUEEZE YOUR SHOULDER BLADES TOGETHER AT THE TOP, LET THEM ROUND FORWARD AT THE BOTTOM","mz":{"back":1.0,"biceps":0.5}},{"n":"ARNOLD PRESS","ws":"3","r":"10","rpe":"RPE7","rest":"1-3 MIN","note":"START WITH YOUR ELBOWS IN FRONT OF YOU AND PALMS FACING IN. ROTATE THE DUMBBELLS SO THAT YOUR PALMS FACE FORWARD AS YOU PRESS.","mz":{"shoulders":1.0,"triceps":0.5}},{"n":"TRICEP PRESSDOWN","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR TRICEPS TO MOVE THE WEIGHT","mz":{"triceps":1.0}},{"n":"HEX BAR OR SMITH MACHINE SHRUG","ws":"3","r":"12","rpe":"RPE6","rest":"1-2 MIN","note":"SHRUG UP AND IN, PULL SHOULDERS UP TO EARS!","mz":{"back":1.0,"shoulders":0.5}}]},{"d":3,"focus":"BACK FOCUSED FULL BODY","ex":[{"n":"WEIGHTED PULL-UP","ws":"3","r":"6","rpe":"RPE8","rest":"2-3 MIN","note":"1.5X SHOULDER WIDTH GRIP, PULL YOUR CHEST TO THE BAR","mz":{"back":1.0,"biceps":1.0}},{"n":"HUMBLE ROW","ws":"3","r":"10","rpe":"RPE8","rest":"2-3 MIN","note":"PIN YOUR LOWER CHEST AGAINST THE TOP OF AN INCLINE BENCH: https://www.instagram.com/p/B5GeRJoBAc1/","mz":{"back":1.0,"biceps":0.5}},{"n":"LEG PRESS","ws":"3","r":"15","rpe":"RPE6","rest":"2-3 MIN","note":"LOW/MEDIUM/HIGH FOOT PLACEMENT, DON'T ALLOW YOUR LOWER BACK TO ROUND","mz":{"quads":1.0,"glutes":0.5}},{"n":"STANDING CALF RAISE","ws":"4","r":"8","rpe":"RPE7","rest":"1-2 MIN","note":"1-2 SECOND PAUSE AT THE BOTTOM OF EACH REP","mz":{"calves":1.0}},{"n":"CABLE ROPE UPRIGHT ROW","ws":"3","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING THE UPPER TRAPS AT THE TOP","mz":{"shoulders":1.0,"back":0.5}},{"n":"HAMMER CURL","ws":"3","r":"8","rpe":"RPE9","rest":"1-2 MIN","note":"3-SECOND ECCENTRIC. ARC THE DUMBBELL \"OUT\" NOT \"UP\", FOCUS ON SQUEEZING YOUR FOREARMS","mz":{"biceps":1.0,"forearms":1.0}}]},{"d":4,"focus":"LOWER FOCUSED FULL BODY 2","ex":[{"n":"DEADLIFT","ws":"4","r":"2","rpe":"85%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1.0,"hamstrings":1.0,"glutes":1.0}},{"n":"DIP","ws":"3","r":"10","rpe":"RPE8","rest":"2-3 MIN","note":"TUCK YOUR ELBOWS AT 45\u00b0, LEAN YOUR TORSO FORWARD 15\u00b0, SHOULDER WIDTH OR SLIGHTLY WIDER GRIP.","mz":{"chest":1.0,"triceps":1.0}},{"n":"GLUTE HAM RAISE","ws":"3","r":"10","rpe":"RPE6","rest":"1-2 MIN","note":"KEEP LOWER BACK STRAIGHT, USE HAMSTRINGS TO CURL YOUR BODY UP","mz":{"hamstrings":1.0,"glutes":0.5}},{"n":"LEG EXTENSION","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR QUADS TO MOVE THE WEIGHT","mz":{"quads":1.0}},{"n":"CABLE PULL-OVER","ws":"3","r":"15","rpe":"RPE7","rest":"1-3 MIN","note":"LEAN YOUR TORSO AT A 45\u00b0 ANGLE, FOCUS ON PULLING THE WEIGHT STRAIGHT DOWN, NOT \"IN\"","mz":{"back":1.0,"chest":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"RAISE THE DUMBBELL \"OUT\" NOT \"UP\", MIND MUSCLE CONNECTION WITH MIDDLE FIBERS","mz":{"shoulders":1.0}},{"n":"ROPE FACE PULL","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"PULL YOUR ELBOWS UP AND OUT, SQUEEZE YOUR SHOULDER BLADES TOGETHER","mz":{"shoulders":1.0,"back":0.5}},{"n":"EZ BAR SKULL CRUSHER","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"ARC THE BAR BACK BEHIND YOUR HEAD, KEEP CONSTANT TENSION ON TRICEPS","mz":{"triceps":1.0}}]},{"d":5,"focus":"DELTOID FOCUSED FULL BODY","ex":[{"n":"OVERHEAD PRESS","ws":"4","r":"6","rpe":"75%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1.0,"triceps":0.5}},{"n":"EGYPTIAN LATERAL RAISE","ws":"3","r":"8","rpe":"RPE8","rest":"1-2 MIN","note":"2-SECOND ECCENTRIC. LEAN AWAY FROM THE CABLE, FOCUS ON SQUEEZING YOUR DELTS","mz":{"shoulders":1.0}},{"n":"CABLE SEATED ROW","ws":"3","r":"12","rpe":"RPE7","rest":"1-3 MIN","note":"FOCUS ON SQUEEZING YOUR SHOULDER BLADES TOGETHER, PULL WITH YOUR ELBOWS DOWN AND IN","mz":{"back":1.0,"biceps":0.5}},{"n":"SEATED HIP ABDUCTION","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON DRIVING YOUR KNEES OUT","mz":{"glutes":1.0}},{"n":"INCLINE DUMBBELL CURL","ws":"2","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"BRACE UPPER BACK AGAINST BENCH, 45 DEGREE INCLINE, KEEP SHOULDERS BACK AS YOU CURL","mz":{"biceps":1.0}},{"n":"BICYCLE CRUNCH","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON FLEXING AND ROTATING YOUR SPINE, BRING YOUR LEFT ELBOW TO RIGHT KNEE, RIGHT ELBOW TO LEFT KNEE","mz":{"abs":1.0}},{"n":"STANDING CALF RAISE","ws":"4","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"PRESS ONTO YOUR TOES","mz":{"calves":1.0}},{"n":"PUSH UP","ws":"2","r":"RPE ONLY","rpe":"RPE6","rest":"1-2 MIN","note":"PERFORM AS MANY REPS AS YOU CAN TO HIT TARGET RPE","mz":{"chest":1.0,"triceps":0.5}}]}]},{"wk":2,"blk":1,"days":[{"d":1,"focus":"LOWER FOCUSED FULL BODY","ex":[{"n":"BACK SQUAT","ws":"3","r":"6","rpe":"77.5%","rest":"2-4 MIN","note":"SIT BACK AND DOWN, 15\u00b0 TOE FLARE, DRIVE YOUR KNEES OUT LATERALLY","mz":{"quads":1.0,"glutes":1.0,"hamstrings":0.5}},{"n":"DUMBBELL INCLINE PRESS","ws":"3","r":"8","rpe":"RPE8","rest":"2-3 MIN","note":"~45 DEGREE INCLINE, MIND MUSCLE CONNECTION WITH UPPER PECS","mz":{"chest":1.0,"shoulders":0.5,"triceps":0.5}},{"n":"LYING LEG CURL","ws":"3","r":"10","rpe":"RPE6","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR HAMSTRINGS TO MOVE THE WEIGHT","mz":{"hamstrings":1.0}},{"n":"PRONATED PULLDOWN","ws":"3","r":"10","rpe":"RPE7","rest":"2-3 MIN","note":"PULL YOUR ELBOWS DOWN AND IN","mz":{"back":1.0,"biceps":0.5}},{"n":"SUPINATED EZ BAR CURL","ws":"3","r":"15/15","rpe":"RPE9","rest":"1-2 MIN","note":"DROPSET. DROP WEIGHT BY ~50% ON SECOND 15 REPS. 30 REPS TOTAL.","mz":{"biceps":1.0}},{"n":"HANGING LEG RAISE","ws":"3","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"ROLL HIPS \"UP\" AS YOU SQUEEZE LOWER ABS, AVOID SWINGING","mz":{"abs":1.0}}]},{"d":2,"focus":"CHEST FOCUSED FULL BODY","ex":[{"n":"BARBELL BENCH PRESS","ws":"3","r":"5","rpe":"80%","rest":"2-4 MIN","note":"SET UP A COMFORTABLE ARCH, 1-2 SECOND PAUSE ON CHEST, EXPLODE OFF CHEST WITH MAX FORCE","mz":{"chest":1.0,"triceps":0.5,"shoulders":0.5}},{"n":"LOW TO HIGH CABLE FLYE","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"START WITH YOUR HANDS OUT TO YOUR SIDES AND PALMS FACING THE CEILING, FOCUS ON PULLING YOUR ELBOWS UP AND IN WHILE ROTATING YOUR PALMS TO FACE THE FLOOR","mz":{"chest":1.0}},{"n":"BARBELL HIP THRUST OR ROMANIAN DEADLIFT","ws":"3","r":"12","rpe":"RPE6","rest":"2-3 MIN","note":"HIP THRUST IF GLUTES ARE PRIORITY, RDL IF HAMSTRINGS ARE PRIORITY FOR YOU. FOCUS ON MIND MUSCLE CONNECTION.","mz":{"glutes":1.0,"hamstrings":1.0}},{"n":"CHEST-SUPPORTED T-BAR ROW","ws":"3","r":"15","rpe":"RPE6","rest":"1-3 MIN","note":"SQUEEZE YOUR SHOULDER BLADES TOGETHER AT THE TOP, LET THEM ROUND FORWARD AT THE BOTTOM","mz":{"back":1.0,"biceps":0.5}},{"n":"ARNOLD PRESS","ws":"3","r":"10","rpe":"RPE7","rest":"1-3 MIN","note":"START WITH YOUR ELBOWS IN FRONT OF YOU AND PALMS FACING IN. ROTATE THE DUMBBELLS SO THAT YOUR PALMS FACE FORWARD AS YOU PRESS.","mz":{"shoulders":1.0,"triceps":0.5}},{"n":"TRICEP PRESSDOWN","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR TRICEPS TO MOVE THE WEIGHT","mz":{"triceps":1.0}},{"n":"HEX BAR OR SMITH MACHINE SHRUG","ws":"3","r":"12","rpe":"RPE6","rest":"1-2 MIN","note":"SHRUG UP AND IN, PULL SHOULDERS UP TO EARS!","mz":{"back":1.0,"shoulders":0.5}}]},{"d":3,"focus":"BACK FOCUSED FULL BODY","ex":[{"n":"WEIGHTED PULL-UP","ws":"3","r":"6","rpe":"RPE9","rest":"2-3 MIN","note":"1.5X SHOULDER WIDTH GRIP, PULL YOUR CHEST TO THE BAR","mz":{"back":1.0,"biceps":1.0}},{"n":"HUMBLE ROW","ws":"3","r":"10","rpe":"RPE8","rest":"2-3 MIN","note":"PIN YOUR LOWER CHEST AGAINST THE TOP OF AN INCLINE BENCH: https://www.instagram.com/p/B5GeRJoBAc1/","mz":{"back":1.0,"biceps":0.5}},{"n":"LEG PRESS","ws":"3","r":"15","rpe":"RPE6","rest":"2-3 MIN","note":"LOW/MEDIUM/HIGH FOOT PLACEMENT, DON'T ALLOW YOUR LOWER BACK TO ROUND","mz":{"quads":1.0,"glutes":0.5}},{"n":"STANDING CALF RAISE","ws":"4","r":"8","rpe":"RPE7","rest":"1-2 MIN","note":"1-2 SECOND PAUSE AT THE BOTTOM OF EACH REP","mz":{"calves":1.0}},{"n":"CABLE ROPE UPRIGHT ROW","ws":"3","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING THE UPPER TRAPS AT THE TOP","mz":{"shoulders":1.0,"back":0.5}},{"n":"HAMMER CURL","ws":"3","r":"8","rpe":"RPE9","rest":"1-2 MIN","note":"3-SECOND ECCENTRIC. ARC THE DUMBBELL \"OUT\" NOT \"UP\", FOCUS ON SQUEEZING YOUR FOREARMS","mz":{"biceps":1.0,"forearms":1.0}}]},{"d":4,"focus":"LOWER FOCUSED FULL BODY 2","ex":[{"n":"RESET DEADLIFT","ws":"3","r":"5","rpe":"80%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1.0,"hamstrings":1.0,"glutes":1.0}},{"n":"DIP","ws":"3","r":"10","rpe":"RPE8","rest":"2-3 MIN","note":"TUCK YOUR ELBOWS AT 45\u00b0, LEAN YOUR TORSO FORWARD 15\u00b0, SHOULDER WIDTH OR SLIGHTLY WIDER GRIP.","mz":{"chest":1.0,"triceps":1.0}},{"n":"GLUTE HAM RAISE","ws":"3","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"KEEP LOWER BACK STRAIGHT, USE HAMSTRINGS TO CURL YOUR BODY UP","mz":{"hamstrings":1.0,"glutes":0.5}},{"n":"LEG EXTENSION","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR QUADS TO MOVE THE WEIGHT","mz":{"quads":1.0}},{"n":"CABLE PULL-OVER","ws":"3","r":"15","rpe":"RPE7","rest":"1-3 MIN","note":"LEAN YOUR TORSO AT A 45\u00b0 ANGLE, FOCUS ON PULLING THE WEIGHT STRAIGHT DOWN, NOT \"IN\"","mz":{"back":1.0,"chest":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"RAISE THE DUMBBELL \"OUT\" NOT \"UP\", MIND MUSCLE CONNECTION WITH MIDDLE FIBERS","mz":{"shoulders":1.0}},{"n":"ROPE FACE PULL","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"PULL YOUR ELBOWS UP AND OUT, SQUEEZE YOUR SHOULDER BLADES TOGETHER","mz":{"shoulders":1.0,"back":0.5}},{"n":"EZ BAR SKULL CRUSHER","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"ARC THE BAR BACK BEHIND YOUR HEAD, KEEP CONSTANT TENSION ON TRICEPS","mz":{"triceps":1.0}}]},{"d":5,"focus":"DELTOID FOCUSED FULL BODY","ex":[{"n":"OVERHEAD PRESS","ws":"4","r":"10","rpe":"65%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1.0,"triceps":0.5}},{"n":"EGYPTIAN LATERAL RAISE","ws":"3","r":"8","rpe":"RPE8","rest":"1-2 MIN","note":"2-SECOND ECCENTRIC. LEAN AWAY FROM THE CABLE, FOCUS ON SQUEEZING YOUR DELTS","mz":{"shoulders":1.0}},{"n":"CABLE SEATED ROW","ws":"3","r":"12","rpe":"RPE7","rest":"1-3 MIN","note":"FOCUS ON SQUEEZING YOUR SHOULDER BLADES TOGETHER, PULL WITH YOUR ELBOWS DOWN AND IN","mz":{"back":1.0,"biceps":0.5}},{"n":"SEATED HIP ABDUCTION","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON DRIVING YOUR KNEES OUT","mz":{"glutes":1.0}},{"n":"INCLINE DUMBBELL CURL","ws":"2","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"BRACE UPPER BACK AGAINST BENCH, 45 DEGREE INCLINE, KEEP SHOULDERS BACK AS YOU CURL","mz":{"biceps":1.0}},{"n":"BICYCLE CRUNCH","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON FLEXING AND ROTATING YOUR SPINE, BRING YOUR LEFT ELBOW TO RIGHT KNEE, RIGHT ELBOW TO LEFT KNEE","mz":{"abs":1.0}},{"n":"STANDING CALF RAISE","ws":"4","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"PRESS ONTO YOUR TOES","mz":{"calves":1.0}},{"n":"PUSH UP","ws":"2","r":"RPE ONLY","rpe":"RPE6","rest":"1-2 MIN","note":"PERFORM AS MANY REPS AS YOU CAN TO HIT TARGET RPE","mz":{"chest":1.0,"triceps":0.5}}]}]},{"wk":3,"blk":1,"days":[{"d":1,"focus":"LOWER FOCUSED FULL BODY","ex":[{"n":"BACK SQUAT","ws":"4","r":"4","rpe":"80%","rest":"2-4 MIN","note":"SIT BACK AND DOWN, 15\u00b0 TOE FLARE, DRIVE YOUR KNEES OUT LATERALLY","mz":{"quads":1.0,"glutes":1.0,"hamstrings":0.5}},{"n":"DUMBBELL INCLINE PRESS","ws":"3","r":"8","rpe":"RPE9","rest":"2-3 MIN","note":"~45 DEGREE INCLINE, MIND MUSCLE CONNECTION WITH UPPER PECS","mz":{"chest":1.0,"shoulders":0.5,"triceps":0.5}},{"n":"LYING LEG CURL","ws":"3","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR HAMSTRINGS TO MOVE THE WEIGHT","mz":{"hamstrings":1.0}},{"n":"PRONATED PULLDOWN","ws":"3","r":"10","rpe":"RPE7","rest":"2-3 MIN","note":"PULL YOUR ELBOWS DOWN AND IN","mz":{"back":1.0,"biceps":0.5}},{"n":"SUPINATED EZ BAR CURL","ws":"3","r":"15/15","rpe":"RPE10","rest":"1-2 MIN","note":"DROPSET. DROP WEIGHT BY ~50% ON SECOND 15 REPS. 30 REPS TOTAL.","mz":{"biceps":1.0}},{"n":"HANGING LEG RAISE","ws":"3","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"ROLL HIPS \"UP\" AS YOU SQUEEZE LOWER ABS, AVOID SWINGING","mz":{"abs":1.0}}]},{"d":2,"focus":"CHEST FOCUSED FULL BODY","ex":[{"n":"BARBELL BENCH PRESS","ws":"3","r":"3","rpe":"85%","rest":"2-4 MIN","note":"SET UP A COMFORTABLE ARCH, 1-2 SECOND PAUSE ON CHEST, EXPLODE OFF CHEST WITH MAX FORCE","mz":{"chest":1.0,"triceps":0.5,"shoulders":0.5}},{"n":"LOW TO HIGH CABLE FLYE","ws":"3","r":"15","rpe":"RPE9","rest":"1-2 MIN","note":"START WITH YOUR HANDS OUT TO YOUR SIDES AND PALMS FACING THE CEILING, FOCUS ON PULLING YOUR ELBOWS UP AND IN WHILE ROTATING YOUR PALMS TO FACE THE FLOOR","mz":{"chest":1.0}},{"n":"BARBELL HIP THRUST OR ROMANIAN DEADLIFT","ws":"3","r":"12","rpe":"RPE7","rest":"2-3 MIN","note":"HIP THRUST IF GLUTES ARE PRIORITY, RDL IF HAMSTRINGS ARE PRIORITY FOR YOU. FOCUS ON MIND MUSCLE CONNECTION.","mz":{"glutes":1.0,"hamstrings":1.0}},{"n":"CHEST-SUPPORTED T-BAR ROW","ws":"3","r":"15","rpe":"RPE7","rest":"1-3 MIN","note":"SQUEEZE YOUR SHOULDER BLADES TOGETHER AT THE TOP, LET THEM ROUND FORWARD AT THE BOTTOM","mz":{"back":1.0,"biceps":0.5}},{"n":"ARNOLD PRESS","ws":"3","r":"10","rpe":"RPE7","rest":"1-3 MIN","note":"START WITH YOUR ELBOWS IN FRONT OF YOU AND PALMS FACING IN. ROTATE THE DUMBBELLS SO THAT YOUR PALMS FACE FORWARD AS YOU PRESS.","mz":{"shoulders":1.0,"triceps":0.5}},{"n":"TRICEP PRESSDOWN","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR TRICEPS TO MOVE THE WEIGHT","mz":{"triceps":1.0}},{"n":"HEX BAR OR SMITH MACHINE SHRUG","ws":"3","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"SHRUG UP AND IN, PULL SHOULDERS UP TO EARS!","mz":{"back":1.0,"shoulders":0.5}}]},{"d":3,"focus":"BACK FOCUSED FULL BODY","ex":[{"n":"WEIGHTED PULL-UP","ws":"3","r":"6","rpe":"RPE9","rest":"2-3 MIN","note":"1.5X SHOULDER WIDTH GRIP, PULL YOUR CHEST TO THE BAR","mz":{"back":1.0,"biceps":1.0}},{"n":"HUMBLE ROW","ws":"3","r":"10","rpe":"RPE9","rest":"2-3 MIN","note":"PIN YOUR LOWER CHEST AGAINST THE TOP OF AN INCLINE BENCH: https://www.instagram.com/p/B5GeRJoBAc1/","mz":{"back":1.0,"biceps":0.5}},{"n":"LEG PRESS","ws":"3","r":"15","rpe":"RPE7","rest":"2-3 MIN","note":"LOW/MEDIUM/HIGH FOOT PLACEMENT, DON'T ALLOW YOUR LOWER BACK TO ROUND","mz":{"quads":1.0,"glutes":0.5}},{"n":"STANDING CALF RAISE","ws":"4","r":"8","rpe":"RPE7","rest":"1-2 MIN","note":"1-2 SECOND PAUSE AT THE BOTTOM OF EACH REP","mz":{"calves":1.0}},{"n":"CABLE ROPE UPRIGHT ROW","ws":"3","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING THE UPPER TRAPS AT THE TOP","mz":{"shoulders":1.0,"back":0.5}},{"n":"HAMMER CURL","ws":"3","r":"8","rpe":"RPE9","rest":"1-2 MIN","note":"3-SECOND ECCENTRIC. ARC THE DUMBBELL \"OUT\" NOT \"UP\", FOCUS ON SQUEEZING YOUR FOREARMS","mz":{"biceps":1.0,"forearms":1.0}}]},{"d":4,"focus":"LOWER FOCUSED FULL BODY 2","ex":[{"n":"DEADLIFT","ws":"4","r":"2","rpe":"87.5%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1.0,"hamstrings":1.0,"glutes":1.0}},{"n":"DIP","ws":"3","r":"10","rpe":"RPE9","rest":"2-3 MIN","note":"TUCK YOUR ELBOWS AT 45\u00b0, LEAN YOUR TORSO FORWARD 15\u00b0, SHOULDER WIDTH OR SLIGHTLY WIDER GRIP.","mz":{"chest":1.0,"triceps":1.0}},{"n":"GLUTE HAM RAISE","ws":"3","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"KEEP LOWER BACK STRAIGHT, USE HAMSTRINGS TO CURL YOUR BODY UP","mz":{"hamstrings":1.0,"glutes":0.5}},{"n":"LEG EXTENSION","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR QUADS TO MOVE THE WEIGHT","mz":{"quads":1.0}},{"n":"CABLE PULL-OVER","ws":"3","r":"15","rpe":"RPE7","rest":"1-3 MIN","note":"LEAN YOUR TORSO AT A 45\u00b0 ANGLE, FOCUS ON PULLING THE WEIGHT STRAIGHT DOWN, NOT \"IN\"","mz":{"back":1.0,"chest":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"RAISE THE DUMBBELL \"OUT\" NOT \"UP\", MIND MUSCLE CONNECTION WITH MIDDLE FIBERS","mz":{"shoulders":1.0}},{"n":"ROPE FACE PULL","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"PULL YOUR ELBOWS UP AND OUT, SQUEEZE YOUR SHOULDER BLADES TOGETHER","mz":{"shoulders":1.0,"back":0.5}},{"n":"EZ BAR SKULL CRUSHER","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"ARC THE BAR BACK BEHIND YOUR HEAD, KEEP CONSTANT TENSION ON TRICEPS","mz":{"triceps":1.0}}]},{"d":5,"focus":"DELTOID FOCUSED FULL BODY","ex":[{"n":"OVERHEAD PRESS","ws":"4","r":"6","rpe":"77.5%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1.0,"triceps":0.5}},{"n":"EGYPTIAN LATERAL RAISE","ws":"3","r":"8","rpe":"RPE9","rest":"1-2 MIN","note":"2-SECOND ECCENTRIC. LEAN AWAY FROM THE CABLE, FOCUS ON SQUEEZING YOUR DELTS","mz":{"shoulders":1.0}},{"n":"CABLE SEATED ROW","ws":"3","r":"12","rpe":"RPE7","rest":"1-3 MIN","note":"FOCUS ON SQUEEZING YOUR SHOULDER BLADES TOGETHER, PULL WITH YOUR ELBOWS DOWN AND IN","mz":{"back":1.0,"biceps":0.5}},{"n":"SEATED HIP ABDUCTION","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON DRIVING YOUR KNEES OUT","mz":{"glutes":1.0}},{"n":"INCLINE DUMBBELL CURL","ws":"2","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"BRACE UPPER BACK AGAINST BENCH, 45 DEGREE INCLINE, KEEP SHOULDERS BACK AS YOU CURL","mz":{"biceps":1.0}},{"n":"BICYCLE CRUNCH","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON FLEXING AND ROTATING YOUR SPINE, BRING YOUR LEFT ELBOW TO RIGHT KNEE, RIGHT ELBOW TO LEFT KNEE","mz":{"abs":1.0}},{"n":"STANDING CALF RAISE","ws":"4","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"PRESS ONTO YOUR TOES","mz":{"calves":1.0}},{"n":"PUSH UP","ws":"2","r":"RPE ONLY","rpe":"RPE7","rest":"1-2 MIN","note":"PERFORM AS MANY REPS AS YOU CAN TO HIT TARGET RPE","mz":{"chest":1.0,"triceps":0.5}}]}]},{"wk":4,"blk":1,"days":[{"d":1,"focus":"LOWER FOCUSED FULL BODY","ex":[{"n":"BACK SQUAT","ws":"3","r":"5","rpe":"80%","rest":"2-4 MIN","note":"SIT BACK AND DOWN, 15\u00b0 TOE FLARE, DRIVE YOUR KNEES OUT LATERALLY","mz":{"quads":1.0,"glutes":1.0,"hamstrings":0.5}},{"n":"DUMBBELL INCLINE PRESS","ws":"3","r":"8","rpe":"RPE9","rest":"2-3 MIN","note":"~45 DEGREE INCLINE, MIND MUSCLE CONNECTION WITH UPPER PECS","mz":{"chest":1.0,"shoulders":0.5,"triceps":0.5}},{"n":"LYING LEG CURL","ws":"3","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR HAMSTRINGS TO MOVE THE WEIGHT","mz":{"hamstrings":1.0}},{"n":"PRONATED PULLDOWN","ws":"3","r":"10","rpe":"RPE8","rest":"2-3 MIN","note":"PULL YOUR ELBOWS DOWN AND IN","mz":{"back":1.0,"biceps":0.5}},{"n":"SUPINATED EZ BAR CURL","ws":"3","r":"15/15","rpe":"RPE10","rest":"1-2 MIN","note":"DROPSET. DROP WEIGHT BY ~50% ON SECOND 15 REPS. 30 REPS TOTAL.","mz":{"biceps":1.0}},{"n":"HANGING LEG RAISE","ws":"3","r":"12","rpe":"RPE8","rest":"1-2 MIN","note":"ROLL HIPS \"UP\" AS YOU SQUEEZE LOWER ABS, AVOID SWINGING","mz":{"abs":1.0}}]},{"d":2,"focus":"CHEST FOCUSED FULL BODY","ex":[{"n":"BARBELL BENCH PRESS","ws":"3","r":"5","rpe":"80%","rest":"2-4 MIN","note":"SET UP A COMFORTABLE ARCH, 1-2 SECOND PAUSE ON CHEST, EXPLODE OFF CHEST WITH MAX FORCE","mz":{"chest":1.0,"triceps":0.5,"shoulders":0.5}},{"n":"LOW TO HIGH CABLE FLYE","ws":"3","r":"15","rpe":"RPE9","rest":"1-2 MIN","note":"START WITH YOUR HANDS OUT TO YOUR SIDES AND PALMS FACING THE CEILING, FOCUS ON PULLING YOUR ELBOWS UP AND IN WHILE ROTATING YOUR PALMS TO FACE THE FLOOR","mz":{"chest":1.0}},{"n":"BARBELL HIP THRUST OR ROMANIAN DEADLIFT","ws":"3","r":"12","rpe":"RPE8","rest":"2-3 MIN","note":"HIP THRUST IF GLUTES ARE PRIORITY, RDL IF HAMSTRINGS ARE PRIORITY FOR YOU. FOCUS ON MIND MUSCLE CONNECTION.","mz":{"glutes":1.0,"hamstrings":1.0}},{"n":"CHEST-SUPPORTED T-BAR ROW","ws":"3","r":"15","rpe":"RPE8","rest":"1-3 MIN","note":"SQUEEZE YOUR SHOULDER BLADES TOGETHER AT THE TOP, LET THEM ROUND FORWARD AT THE BOTTOM","mz":{"back":1.0,"biceps":0.5}},{"n":"ARNOLD PRESS","ws":"3","r":"10","rpe":"RPE8","rest":"1-3 MIN","note":"START WITH YOUR ELBOWS IN FRONT OF YOU AND PALMS FACING IN. ROTATE THE DUMBBELLS SO THAT YOUR PALMS FACE FORWARD AS YOU PRESS.","mz":{"shoulders":1.0,"triceps":0.5}},{"n":"TRICEP PRESSDOWN","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR TRICEPS TO MOVE THE WEIGHT","mz":{"triceps":1.0}},{"n":"HEX BAR OR SMITH MACHINE SHRUG","ws":"3","r":"12","rpe":"RPE8","rest":"1-2 MIN","note":"SHRUG UP AND IN, PULL SHOULDERS UP TO EARS!","mz":{"back":1.0,"shoulders":0.5}}]},{"d":3,"focus":"BACK FOCUSED FULL BODY","ex":[{"n":"WEIGHTED PULL-UP","ws":"3","r":"6","rpe":"RPE9","rest":"2-3 MIN","note":"1.5X SHOULDER WIDTH GRIP, PULL YOUR CHEST TO THE BAR","mz":{"back":1.0,"biceps":1.0}},{"n":"HUMBLE ROW","ws":"3","r":"10","rpe":"RPE9","rest":"2-3 MIN","note":"PIN YOUR LOWER CHEST AGAINST THE TOP OF AN INCLINE BENCH: https://www.instagram.com/p/B5GeRJoBAc1/","mz":{"back":1.0,"biceps":0.5}},{"n":"LEG PRESS","ws":"3","r":"15","rpe":"RPE8","rest":"2-3 MIN","note":"LOW/MEDIUM/HIGH FOOT PLACEMENT, DON'T ALLOW YOUR LOWER BACK TO ROUND","mz":{"quads":1.0,"glutes":0.5}},{"n":"STANDING CALF RAISE","ws":"4","r":"8","rpe":"RPE8","rest":"1-2 MIN","note":"1-2 SECOND PAUSE AT THE BOTTOM OF EACH REP","mz":{"calves":1.0}},{"n":"CABLE ROPE UPRIGHT ROW","ws":"3","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING THE UPPER TRAPS AT THE TOP","mz":{"shoulders":1.0,"back":0.5}},{"n":"HAMMER CURL","ws":"3","r":"8","rpe":"RPE9","rest":"1-2 MIN","note":"3-SECOND ECCENTRIC. ARC THE DUMBBELL \"OUT\" NOT \"UP\", FOCUS ON SQUEEZING YOUR FOREARMS","mz":{"biceps":1.0,"forearms":1.0}}]},{"d":4,"focus":"LOWER FOCUSED FULL BODY 2","ex":[{"n":"RESET DEADLIFT","ws":"3","r":"5","rpe":"80%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1.0,"hamstrings":1.0,"glutes":1.0}},{"n":"DIP","ws":"3","r":"10","rpe":"RPE9","rest":"2-3 MIN","note":"TUCK YOUR ELBOWS AT 45\u00b0, LEAN YOUR TORSO FORWARD 15\u00b0, SHOULDER WIDTH OR SLIGHTLY WIDER GRIP.","mz":{"chest":1.0,"triceps":1.0}},{"n":"GLUTE HAM RAISE","ws":"3","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"KEEP LOWER BACK STRAIGHT, USE HAMSTRINGS TO CURL YOUR BODY UP","mz":{"hamstrings":1.0,"glutes":0.5}},{"n":"LEG EXTENSION","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR QUADS TO MOVE THE WEIGHT","mz":{"quads":1.0}},{"n":"CABLE PULL-OVER","ws":"3","r":"15","rpe":"RPE8","rest":"1-3 MIN","note":"LEAN YOUR TORSO AT A 45\u00b0 ANGLE, FOCUS ON PULLING THE WEIGHT STRAIGHT DOWN, NOT \"IN\"","mz":{"back":1.0,"chest":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"3","r":"20","rpe":"RPE8","rest":"1-2 MIN","note":"RAISE THE DUMBBELL \"OUT\" NOT \"UP\", MIND MUSCLE CONNECTION WITH MIDDLE FIBERS","mz":{"shoulders":1.0}},{"n":"ROPE FACE PULL","ws":"3","r":"20","rpe":"RPE8","rest":"1-2 MIN","note":"PULL YOUR ELBOWS UP AND OUT, SQUEEZE YOUR SHOULDER BLADES TOGETHER","mz":{"shoulders":1.0,"back":0.5}},{"n":"EZ BAR SKULL CRUSHER","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"ARC THE BAR BACK BEHIND YOUR HEAD, KEEP CONSTANT TENSION ON TRICEPS","mz":{"triceps":1.0}}]},{"d":5,"focus":"DELTOID FOCUSED FULL BODY","ex":[{"n":"OVERHEAD PRESS","ws":"4","r":"10","rpe":"67.5%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1.0,"triceps":0.5}},{"n":"EGYPTIAN LATERAL RAISE","ws":"3","r":"8","rpe":"RPE9","rest":"1-2 MIN","note":"2-SECOND ECCENTRIC. LEAN AWAY FROM THE CABLE, FOCUS ON SQUEEZING YOUR DELTS","mz":{"shoulders":1.0}},{"n":"CABLE SEATED ROW","ws":"3","r":"12","rpe":"RPE8","rest":"1-3 MIN","note":"FOCUS ON SQUEEZING YOUR SHOULDER BLADES TOGETHER, PULL WITH YOUR ELBOWS DOWN AND IN","mz":{"back":1.0,"biceps":0.5}},{"n":"SEATED HIP ABDUCTION","ws":"3","r":"20","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON DRIVING YOUR KNEES OUT","mz":{"glutes":1.0}},{"n":"INCLINE DUMBBELL CURL","ws":"2","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"BRACE UPPER BACK AGAINST BENCH, 45 DEGREE INCLINE, KEEP SHOULDERS BACK AS YOU CURL","mz":{"biceps":1.0}},{"n":"BICYCLE CRUNCH","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON FLEXING AND ROTATING YOUR SPINE, BRING YOUR LEFT ELBOW TO RIGHT KNEE, RIGHT ELBOW TO LEFT KNEE","mz":{"abs":1.0}},{"n":"STANDING CALF RAISE","ws":"4","r":"12","rpe":"RPE8","rest":"1-2 MIN","note":"PRESS ONTO YOUR TOES","mz":{"calves":1.0}},{"n":"PUSH UP","ws":"2","r":"RPE ONLY","rpe":"RPE8","rest":"1-2 MIN","note":"PERFORM AS MANY REPS AS YOU CAN TO HIT TARGET RPE","mz":{"chest":1.0,"triceps":0.5}}]}]},{"wk":5,"blk":2,"days":[{"d":1,"focus":"LOWER FOCUSED FULL BODY","ex":[{"n":"[TOPSET] BACK SQUAT","ws":"1","r":"3-5","rpe":"87.5%","rest":"2-4 MIN","note":"IF YOU\u2019RE FEELING STRONG AND CONFIDENT, GO FOR 5. IF YOU FEEL LESS STRONG, PLAY IT SAFE WITH 3-4 REPS.","mz":{"quads":1.0,"glutes":1.0,"hamstrings":0.5}},{"n":"[BACK OFF] BACK SQUAT","ws":"2","r":"5","rpe":"75%","rest":"2-4 MIN","note":"SIT BACK AND DOWN, 15\u00b0 TOE FLARE, DRIVE YOUR KNEES OUT LATERALLY","mz":{"quads":1.0,"glutes":1.0,"hamstrings":0.5}},{"n":"BARBELL OVERHEAD PRESS","ws":"4","r":"6","rpe":"80%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1.0,"triceps":0.5}},{"n":"SWISS BALL LEG CURL","ws":"3","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"PREVENT YOUR HIPS FROM TOUCHING THE GROUND. DIG YOUR HEELS INTO THE BALL","mz":{"hamstrings":1.0}},{"n":"CHIN-UP","ws":"4","r":"8","rpe":"RPE7","rest":"2-3 MIN","note":"1.5X SHOULDER WIDTH GRIP, PULL YOUR CHEST TO THE BAR","mz":{"back":1.0,"biceps":1.0}},{"n":"SUPINATED EZ BAR CURL","ws":"3","r":"10+2","rpe":"RPE10","rest":"1-2 MIN","note":"10 REPS WITH GOOD CONTROL + 2 REPS WITH MODERATE CHEATING/MOMENTUM","mz":{"biceps":1.0}},{"n":"AB WHEEL ROLLOUT","ws":"3","r":"6","rpe":"RPE7","rest":"1-2 MIN","note":"SQUEEZE YOUR GLUTES, DON'T PULL FROM YOUR ARMS","mz":{"abs":1.0}}]},{"d":2,"focus":"CHEST FOCUSED FULL BODY","ex":[{"n":"BARBELL BENCH PRESS","ws":"3","r":"3","rpe":"87.5%","rest":"2-4 MIN","note":"ELBOWS AT A 45\u00b0 ANGLE. SQUEEZE YOUR SHOULDER BLADES AND STAY FIRM ON THE BENCH","mz":{"chest":1.0,"triceps":0.5,"shoulders":0.5}},{"n":"LOW INCLINE DUMBBELL PRESS","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"15\u00b0 BENCH ANGLE. TUCK YOUR ELBOWS","mz":{"chest":1.0,"triceps":0.5}},{"n":"BARBELL HIP THRUST OR ROMANIAN DEADLIFT","ws":"4","r":"12","rpe":"RPE7","rest":"2-3 MIN","note":"HIP THRUST IF GLUTES ARE PRIORITY, RDL IF HAMSTRINGS ARE PRIORITY FOR YOU. FOCUS ON MIND MUSCLE CONNECTION.","mz":{"glutes":1.0,"hamstrings":1.0}},{"n":"DUMBBELL ROW","ws":"4","r":"12","rpe":"RPE7","rest":"1-3 MIN","note":"PULL THE DUMBBELL TO YOUR HIP","mz":{"back":1.0,"biceps":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"4","r":"15","rpe":"RPE7","rest":"1-3 MIN","note":"TILT THE DUMBBELL SUCH THAT YOUR PINKY COMES UP FIRST","mz":{"shoulders":1.0}},{"n":"OVERHEAD TRICEP EXTENSION","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR TRICEPS TO MOVE THE WEIGHT","mz":{"triceps":1.0}},{"n":"HEX BAR OR SMITH MACHINE SHRUG","ws":"3","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"SHRUG UP AND IN, PULL SHOULDERS UP TO EARS!","mz":{"back":1.0,"shoulders":0.5}}]},{"d":3,"focus":"BACK FOCUSED FULL BODY","ex":[{"n":"WEIGHTED PULL-UP","ws":"3","r":"6","rpe":"RPE9","rest":"2-3 MIN","note":"1.5X SHOULDER WIDTH GRIP, PULL YOUR CHEST TO THE BAR","mz":{"back":1.0,"biceps":1.0}},{"n":"BANDED CHEST- SUPPORTED T-BAR ROW","ws":"4","r":"10","rpe":"RPE8","rest":"2-3 MIN","note":"SQUEEZE YOUR SHOULDER BLADES TOGETHER AT THE TOP, LET THEM ROUND FORWARD AT THE BOTTOM","mz":{"back":1.0,"biceps":0.5}},{"n":"SINGLE-LEG LEG PRESS","ws":"4","r":"15","rpe":"RPE7","rest":"2-3 MIN","note":"LOW/MEDIUM/HIGH FOOT PLACEMENT, DON'T ALLOW YOUR LOWER BACK TO ROUND","mz":{"quads":1.0,"glutes":0.5}},{"n":"ECCENTRIC- ACCENTUATED STANDING CALF RAISE","ws":"4","r":"8","rpe":"RPE7","rest":"1-2 MIN","note":"PRESS ONTO YOUR TOES. 4-SECOND ECCENTRIC","mz":{"calves":1.0}},{"n":"CABLE ROPE UPRIGHT ROW","ws":"4","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING THE UPPER TRAPS AT THE TOP","mz":{"shoulders":1.0,"back":0.5}},{"n":"CABLE SINGLE-ARM CURL","ws":"4","r":"8","rpe":"RPE7","rest":"1-2 MIN","note":"KEEP YOUR SHOULDER JOINT HYPEREXTENDED (ELBOW BEHIND TORSO)","mz":{"biceps":1.0}}]},{"d":4,"focus":"LOWER FOCUSED FULL BODY 2","ex":[{"n":"[TOPSET] DEADLIFT","ws":"1","r":"2","rpe":"90%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1.0,"hamstrings":1.0,"glutes":1.0}},{"n":"[BACK OFF] RESET DEADLIFT","ws":"3","r":"2","rpe":"80%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1.0,"hamstrings":1.0,"glutes":1.0}},{"n":"DECLINE BENCH PRESS","ws":"4","r":"8","rpe":"RPE7","rest":"2-3 MIN","note":"CONSTANT TENSION REPS, TOUCH BAR TO CHEST","mz":{"chest":1.0,"triceps":0.5}},{"n":"GLUTE HAM RAISE","ws":"4","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"KEEP LOWER BACK STRAIGHT, USE HAMSTRINGS TO CURL YOUR BODY UP","mz":{"hamstrings":1.0,"glutes":0.5}},{"n":"LEG EXTENSION","ws":"4","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR QUADS TO MOVE THE WEIGHT","mz":{"quads":1.0}},{"n":"CABLE PULL-OVER","ws":"3","r":"15","rpe":"RPE7","rest":"1-3 MIN","note":"LEAN YOUR TORSO AT A 45\u00b0 ANGLE, FOCUS ON PULLING THE WEIGHT STRAIGHT DOWN, NOT \"IN\"","mz":{"back":1.0,"chest":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"RAISE THE DUMBBELL \"OUT\" NOT \"UP\", MIND MUSCLE CONNECTION WITH MIDDLE FIBERS","mz":{"shoulders":1.0}},{"n":"EZ BAR SKULL CRUSHER","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"ARC THE BAR BACK BEHIND YOUR HEAD, KEEP CONSTANT TENSION ON TRICEPS","mz":{"triceps":1.0}}]},{"d":5,"focus":"DELTOID FOCUSED FULL BODY","ex":[{"n":"OVERHEAD PRESS","ws":"3","r":"8","rpe":"80%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1.0,"triceps":0.5}},{"n":"CABLE LATERAL RAISE","ws":"3","r":"8","rpe":"RPE8","rest":"1-2 MIN","note":"SWING THE WEIGHT \"OUT\", NOT \"UP\"","mz":{"shoulders":1.0}},{"n":"PENDLAY ROW","ws":"4","r":"10","rpe":"RPE7","rest":"1-3 MIN","note":"KEEP A FLAT BACK, PULL YOUR ELBOWS BACK AT 45 DEGREE ANGLE","mz":{"back":1.0,"biceps":0.5}},{"n":"SEATED HIP ABDUCTION","ws":"4","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON DRIVING YOUR KNEES OUT","mz":{"glutes":1.0}},{"n":"EZ BAR CURL 21S","ws":"2","r":"7/7/7","rpe":"RPE7","rest":"1-2 MIN","note":"FIRST 7 REPS BOTTOM HALF OF ROM, NEXT 7 REPS TOP HALF OF ROM, LAST 7 REPS FULL ROM","mz":{"biceps":1.0,"forearms":0.5}},{"n":"CABLE CRUNCH","ws":"4","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON FLEXING YOUR SPINE. AVOID YANKING WITH YOUR ARMS","mz":{"abs":1.0}},{"n":"STANDING CALF RAISE","ws":"4","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"1-2 SECOND PAUSE AT THE BOTTOM OF EACH REP","mz":{"calves":1.0}},{"n":"PUSH UP","ws":"2","r":"RPE ONLY","rpe":"RPE7","rest":"1-2 MIN","note":"PERFORM AS MANY REPS AS YOU CAN TO HIT TARGET RPE","mz":{"chest":1.0,"triceps":0.5}}]}]},{"wk":6,"blk":2,"days":[{"d":1,"focus":"LOWER FOCUSED FULL BODY","ex":[{"n":"[TOPSET] BACK SQUAT","ws":"1","r":"2","rpe":"90%","rest":"2-4 MIN","note":"SIT BACK AND DOWN, 15\u00b0 TOE FLARE, DRIVE YOUR KNEES OUT LATERALLY","mz":{"quads":1.0,"glutes":1.0,"hamstrings":0.5}},{"n":"[BACK OFF] BACK SQUAT","ws":"2","r":"3","rpe":"85%","rest":"2-4 MIN","note":"SIT BACK AND DOWN, 15\u00b0 TOE FLARE, DRIVE YOUR KNEES OUT LATERALLY","mz":{"quads":1.0,"glutes":1.0,"hamstrings":0.5}},{"n":"BARBELL OVERHEAD PRESS","ws":"4","r":"8","rpe":"75%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1.0,"triceps":0.5}},{"n":"SWISS BALL LEG CURL","ws":"3","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"PREVENT YOUR HIPS FROM TOUCHING THE GROUND. DIG YOUR HEELS INTO THE BALL","mz":{"hamstrings":1.0}},{"n":"CHIN-UP","ws":"4","r":"8","rpe":"RPE7","rest":"2-3 MIN","note":"SUPINATED (UNDERHAND) SHOULDER WIDTH GRIP, PULL WITH LATS","mz":{"back":1.0,"biceps":1.0}},{"n":"SUPINATED EZ BAR CURL","ws":"3","r":"10+2","rpe":"RPE10","rest":"1-2 MIN","note":"10 REPS WITH GOOD CONTROL + 2 REPS WITH MODERATE CHEATING/MOMENTUM","mz":{"biceps":1.0}},{"n":"AB WHEEL ROLLOUT","ws":"3","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"SQUEEZE YOUR GLUTES, DON'T PULL FROM YOUR ARMS","mz":{"abs":1.0}}]},{"d":2,"focus":"CHEST FOCUSED FULL BODY","ex":[{"n":"BARBELL BENCH PRESS","ws":"3","r":"5","rpe":"85%","rest":"2-4 MIN","note":"ELBOWS AT A 45\u00b0 ANGLE. SQUEEZE YOUR SHOULDER BLADES AND STAY FIRM ON THE BENCH","mz":{"chest":1.0,"triceps":0.5,"shoulders":0.5}},{"n":"LOW INCLINE DUMBBELL PRESS","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"15\u00b0 BENCH ANGLE. TUCK YOUR ELBOWS","mz":{"chest":1.0,"triceps":0.5}},{"n":"BARBELL HIP THRUST OR ROMANIAN DEADLIFT","ws":"4","r":"12","rpe":"RPE7","rest":"2-3 MIN","note":"HIP THRUST IF GLUTES ARE PRIORITY, RDL IF HAMSTRINGS ARE PRIORITY FOR YOU. FOCUS ON MIND MUSCLE CONNECTION.","mz":{"glutes":1.0,"hamstrings":1.0}},{"n":"DUMBBELL ROW","ws":"4","r":"12","rpe":"RPE7","rest":"1-3 MIN","note":"PULL THE DUMBBELL TO YOUR HIP","mz":{"back":1.0,"biceps":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"4","r":"15","rpe":"RPE7","rest":"1-3 MIN","note":"RAISE THE DUMBBELL \"OUT\" NOT \"UP\", MIND MUSCLE CONNECTION WITH MIDDLE FIBERS","mz":{"shoulders":1.0}},{"n":"OVERHEAD TRICEP EXTENSION","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR TRICEPS TO MOVE THE WEIGHT","mz":{"triceps":1.0}},{"n":"HEX BAR OR SMITH MACHINE SHRUG","ws":"3","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"SHRUG UP AND IN, PULL SHOULDERS UP TO EARS!","mz":{"back":1.0,"shoulders":0.5}}]},{"d":3,"focus":"BACK FOCUSED FULL BODY","ex":[{"n":"WEIGHTED PULL-UP","ws":"4","r":"3","rpe":"RPE9","rest":"2-3 MIN","note":"1.5X SHOULDER WIDTH GRIP, PULL YOUR CHEST TO THE BAR","mz":{"back":1.0,"biceps":1.0}},{"n":"BANDED CHEST- SUPPORTED T-BAR ROW","ws":"4","r":"10","rpe":"RPE8","rest":"2-3 MIN","note":"BE EXPLOSIVE AT THE BOTTOM, DRIVE ELBOWS BACK HARD!","mz":{"back":1.0,"biceps":0.5}},{"n":"SINGLE-LEG LEG PRESS","ws":"4","r":"15","rpe":"RPE7","rest":"2-3 MIN","note":"LOW/MEDIUM/HIGH FOOT PLACEMENT, DON'T ALLOW YOUR LOWER BACK TO ROUND","mz":{"quads":1.0,"glutes":0.5}},{"n":"ECCENTRIC- ACCENTUATED STANDING CALF RAISE","ws":"4","r":"8","rpe":"RPE7","rest":"1-2 MIN","note":"PRESS ONTO YOUR TOES. 4-SECOND ECCENTRIC","mz":{"calves":1.0}},{"n":"CABLE ROPE UPRIGHT ROW","ws":"4","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING THE UPPER TRAPS AT THE TOP","mz":{"shoulders":1.0,"back":0.5}},{"n":"CABLE SINGLE-ARM CURL","ws":"4","r":"8","rpe":"RPE7","rest":"1-2 MIN","note":"KEEP YOUR SHOULDER JOINT HYPEREXTENDED (ELBOW BEHIND TORSO)","mz":{"biceps":1.0}}]},{"d":4,"focus":"LOWER FOCUSED FULL BODY 2","ex":[{"n":"[TOPSET] DEADLIFT","ws":"1","r":"4","rpe":"85%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1.0,"hamstrings":1.0,"glutes":1.0}},{"n":"[BACK OFF] RESET DEADLIFT","ws":"3","r":"4","rpe":"75%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1.0,"hamstrings":1.0,"glutes":1.0}},{"n":"DECLINE BENCH PRESS","ws":"4","r":"8","rpe":"RPE7","rest":"2-3 MIN","note":"CONSTANT TENSION REPS, TOUCH BAR TO CHEST","mz":{"chest":1.0,"triceps":0.5}},{"n":"GLUTE HAM RAISE","ws":"4","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"KEEP LOWER BACK STRAIGHT, USE HAMSTRINGS TO CURL YOUR BODY UP","mz":{"hamstrings":1.0,"glutes":0.5}},{"n":"LEG EXTENSION","ws":"4","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR QUADS TO MOVE THE WEIGHT","mz":{"quads":1.0}},{"n":"CABLE PULL-OVER","ws":"3","r":"15","rpe":"RPE7","rest":"1-3 MIN","note":"LEAN YOUR TORSO AT A 45\u00b0 ANGLE, FOCUS ON PULLING THE WEIGHT STRAIGHT DOWN, NOT \"IN\"","mz":{"back":1.0,"chest":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"RAISE THE DUMBBELL \"OUT\" NOT \"UP\", MIND MUSCLE CONNECTION WITH MIDDLE FIBERS","mz":{"shoulders":1.0}},{"n":"REVERSE PEC DECK","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"SWING THE WEIGHT \"OUT\", NOT \"BACK\"","mz":{"shoulders":1.0,"back":0.5}},{"n":"EZ BAR SKULL CRUSHER","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"ARC THE BAR BACK BEHIND YOUR HEAD, KEEP CONSTANT TENSION ON TRICEPS","mz":{"triceps":1.0}}]},{"d":5,"focus":"DELTOID FOCUSED FULL BODY","ex":[{"n":"OVERHEAD PRESS","ws":"4","r":"4","rpe":"82.5%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1.0,"triceps":0.5}},{"n":"CABLE LATERAL RAISE","ws":"3","r":"8","rpe":"RPE8","rest":"1-2 MIN","note":"SWING THE WEIGHT \"OUT\", NOT \"UP\"","mz":{"shoulders":1.0}},{"n":"PENDLAY ROW","ws":"4","r":"12","rpe":"RPE7","rest":"1-3 MIN","note":"KEEP A FLAT BACK, PULL YOUR ELBOWS BACK AT 45 DEGREE ANGLE","mz":{"back":1.0,"biceps":0.5}},{"n":"SEATED HIP ABDUCTION","ws":"4","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON DRIVING YOUR KNEES OUT","mz":{"glutes":1.0}},{"n":"EZ BAR CURL 21S","ws":"2","r":"7/7/7","rpe":"RPE7","rest":"1-2 MIN","note":"FIRST 7 REPS BOTTOM HALF OF ROM, NEXT 7 REPS TOP HALF OF ROM, LAST 7 REPS FULL ROM","mz":{"biceps":1.0,"forearms":0.5}},{"n":"CABLE CRUNCH","ws":"4","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON FLEXING YOUR SPINE. AVOID YANKING WITH YOUR ARMS","mz":{"abs":1.0}},{"n":"STANDING CALF RAISE","ws":"4","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"1-2 SECOND PAUSE AT THE BOTTOM OF EACH REP","mz":{"calves":1.0}},{"n":"PUSH UP","ws":"2","r":"RPE ONLY","rpe":"RPE7","rest":"1-2 MIN","note":"PERFORM AS MANY REPS AS YOU CAN TO HIT TARGET RPE","mz":{"chest":1.0,"triceps":0.5}}]}]},{"wk":7,"blk":2,"days":[{"d":1,"focus":"LOWER FOCUSED FULL BODY","ex":[{"n":"[TOPSET] BACK SQUAT","ws":"1","r":"6-8","rpe":"80%","rest":"2-4 MIN","note":"SIT BACK AND DOWN, 15\u00b0 TOE FLARE, DRIVE YOUR KNEES OUT LATERALLY","mz":{"quads":1.0,"glutes":1.0,"hamstrings":0.5}},{"n":"[BACK OFF] BACK SQUAT","ws":"2","r":"8","rpe":"70%","rest":"2-4 MIN","note":"SIT BACK AND DOWN, 15\u00b0 TOE FLARE, DRIVE YOUR KNEES OUT LATERALLY","mz":{"quads":1.0,"glutes":1.0,"hamstrings":0.5}},{"n":"BARBELL OVERHEAD PRESS","ws":"4","r":"10","rpe":"65%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1.0,"triceps":0.5}},{"n":"SWISS BALL LEG CURL","ws":"3","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"PREVENT YOUR HIPS FROM TOUCHING THE GROUND. DIG YOUR HEELS INTO THE BALL","mz":{"hamstrings":1.0}},{"n":"CHIN-UP","ws":"4","r":"8","rpe":"RPE8","rest":"2-3 MIN","note":"SUPINATED (UNDERHAND) SHOULDER WIDTH GRIP, PULL WITH LATS","mz":{"back":1.0,"biceps":1.0}},{"n":"SUPINATED EZ BAR CURL","ws":"3","r":"10+2","rpe":"RPE10","rest":"1-2 MIN","note":"10 REPS WITH GOOD CONTROL + 2 REPS WITH MODERATE CHEATING/MOMENTUM","mz":{"biceps":1.0}},{"n":"AB WHEEL ROLLOUT","ws":"3","r":"12","rpe":"RPE8","rest":"1-2 MIN","note":"SQUEEZE YOUR GLUTES, DON'T PULL FROM YOUR ARMS","mz":{"abs":1.0}}]},{"d":2,"focus":"CHEST FOCUSED FULL BODY","ex":[{"n":"BARBELL BENCH PRESS","ws":"3","r":"10","rpe":"75%","rest":"2-4 MIN","note":"ELBOWS AT A 45\u00b0 ANGLE. SQUEEZE YOUR SHOULDER BLADES AND STAY FIRM ON THE BENCH","mz":{"chest":1.0,"triceps":0.5,"shoulders":0.5}},{"n":"LOW INCLINE DUMBBELL PRESS","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"15\u00b0 BENCH ANGLE. TUCK YOUR ELBOWS","mz":{"chest":1.0,"triceps":0.5}},{"n":"BARBELL HIP THRUST OR ROMANIAN DEADLIFT","ws":"4","r":"12","rpe":"RPE8","rest":"2-3 MIN","note":"HIP THRUST IF GLUTES ARE PRIORITY, RDL IF HAMSTRINGS ARE PRIORITY FOR YOU. FOCUS ON MIND MUSCLE CONNECTION.","mz":{"glutes":1.0,"hamstrings":1.0}},{"n":"DUMBBELL ROW","ws":"4","r":"12","rpe":"RPE8","rest":"1-3 MIN","note":"PULL THE DUMBBELL TO YOUR HIP","mz":{"back":1.0,"biceps":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"4","r":"15","rpe":"RPE8","rest":"1-3 MIN","note":"RAISE THE DUMBBELL \"OUT\" NOT \"UP\", MIND MUSCLE CONNECTION WITH MIDDLE FIBERS","mz":{"shoulders":1.0}},{"n":"OVERHEAD TRICEP EXTENSION","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR TRICEPS TO MOVE THE WEIGHT","mz":{"triceps":1.0}},{"n":"HEX BAR OR SMITH MACHINE SHRUG","ws":"3","r":"12","rpe":"RPE8","rest":"1-2 MIN","note":"SHRUG UP AND IN, PULL SHOULDERS UP TO EARS!","mz":{"back":1.0,"shoulders":0.5}}]},{"d":3,"focus":"BACK FOCUSED FULL BODY","ex":[{"n":"WEIGHTED PULL-UP","ws":"3","r":"10","rpe":"RPE9","rest":"2-3 MIN","note":"1.5X SHOULDER WIDTH GRIP, PULL YOUR CHEST TO THE BAR","mz":{"back":1.0,"biceps":1.0}},{"n":"BANDED CHEST- SUPPORTED T-BAR ROW","ws":"4","r":"10","rpe":"RPE8","rest":"2-3 MIN","note":"BE EXPLOSIVE AT THE BOTTOM, DRIVE ELBOWS BACK HARD!","mz":{"back":1.0,"biceps":0.5}},{"n":"SINGLE-LEG LEG PRESS","ws":"4","r":"15","rpe":"RPE8","rest":"2-3 MIN","note":"LOW/MEDIUM/HIGH FOOT PLACEMENT, DON'T ALLOW YOUR LOWER BACK TO ROUND","mz":{"quads":1.0,"glutes":0.5}},{"n":"ECCENTRIC- ACCENTUATED STANDING CALF RAISE","ws":"4","r":"8","rpe":"RPE8","rest":"1-2 MIN","note":"PRESS ONTO YOUR TOES. 4-SECOND ECCENTRIC","mz":{"calves":1.0}},{"n":"CABLE ROPE UPRIGHT ROW","ws":"4","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING THE UPPER TRAPS AT THE TOP","mz":{"shoulders":1.0,"back":0.5}},{"n":"CABLE SINGLE-ARM CURL","ws":"4","r":"8","rpe":"RPE8","rest":"1-2 MIN","note":"KEEP YOUR SHOULDER JOINT HYPEREXTENDED (ELBOW BEHIND TORSO)","mz":{"biceps":1.0}}]},{"d":4,"focus":"LOWER FOCUSED FULL BODY 2","ex":[{"n":"[TOPSET] DEADLIFT","ws":"1","r":"6","rpe":"80%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1.0,"hamstrings":1.0,"glutes":1.0}},{"n":"[BACK OFF] RESET DEADLIFT","ws":"3","r":"6","rpe":"70%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1.0,"hamstrings":1.0,"glutes":1.0}},{"n":"DECLINE BENCH PRESS","ws":"4","r":"8","rpe":"RPE 7","rest":"2-3 MIN","note":"CONSTANT TENSION REPS, TOUCH BAR TO CHEST","mz":{"chest":1.0,"triceps":0.5}},{"n":"GLUTE HAM RAISE","ws":"4","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"KEEP LOWER BACK STRAIGHT, USE HAMSTRINGS TO CURL YOUR BODY UP","mz":{"hamstrings":1.0,"glutes":0.5}},{"n":"LEG EXTENSION","ws":"4","r":"12","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR QUADS TO MOVE THE WEIGHT","mz":{"quads":1.0}},{"n":"CABLE PULL-OVER","ws":"3","r":"15","rpe":"RPE8","rest":"1-3 MIN","note":"LEAN YOUR TORSO AT A 45\u00b0 ANGLE, FOCUS ON PULLING THE WEIGHT STRAIGHT DOWN, NOT \"IN\"","mz":{"back":1.0,"chest":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"3","r":"20","rpe":"RPE8","rest":"1-2 MIN","note":"RAISE THE DUMBBELL \"OUT\" NOT \"UP\", MIND MUSCLE CONNECTION WITH MIDDLE FIBERS","mz":{"shoulders":1.0}},{"n":"REVERSE PEC DECK","ws":"3","r":"20","rpe":"RPE8","rest":"1-2 MIN","note":"SWING THE WEIGHT \"OUT\", NOT \"BACK\"","mz":{"shoulders":1.0,"back":0.5}},{"n":"EZ BAR SKULL CRUSHER","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"ARC THE BAR BACK BEHIND YOUR HEAD, KEEP CONSTANT TENSION ON TRICEPS","mz":{"triceps":1.0}}]},{"d":5,"focus":"DELTOID FOCUSED FULL BODY","ex":[{"n":"OVERHEAD PRESS","ws":"4","r":"6","rpe":"80%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1.0,"triceps":0.5}},{"n":"CABLE LATERAL RAISE","ws":"3","r":"8","rpe":"RPE8","rest":"1-2 MIN","note":"SWING THE WEIGHT \"OUT\", NOT \"UP\"","mz":{"shoulders":1.0}},{"n":"PENDLAY ROW","ws":"4","r":"12","rpe":"RPE8","rest":"1-3 MIN","note":"KEEP A FLAT BACK, PULL YOUR ELBOWS BACK AT 45 DEGREE ANGLE","mz":{"back":1.0,"biceps":0.5}},{"n":"SEATED HIP ABDUCTION","ws":"4","r":"20","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON DRIVING YOUR KNEES OUT","mz":{"glutes":1.0}},{"n":"EZ BAR CURL 21S","ws":"2","r":"7/7/7","rpe":"RPE8","rest":"1-2 MIN","note":"FIRST 7 REPS BOTTOM HALF OF ROM, NEXT 7 REPS TOP HALF OF ROM, LAST 7 REPS FULL ROM","mz":{"biceps":1.0,"forearms":0.5}},{"n":"CABLE CRUNCH","ws":"4","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON FLEXING YOUR SPINE. AVOID YANKING WITH YOUR ARMS","mz":{"abs":1.0}},{"n":"STANDING CALF RAISE","ws":"4","r":"12","rpe":"RPE8","rest":"1-2 MIN","note":"1-2 SECOND PAUSE AT THE BOTTOM OF EACH REP","mz":{"calves":1.0}},{"n":"PUSH UP","ws":"2","r":"RPE ONLY","rpe":"RPE7","rest":"1-2 MIN","note":"PERFORM AS MANY REPS AS YOU CAN TO HIT TARGET RPE","mz":{"chest":1.0,"triceps":0.5}}]}]},{"wk":8,"blk":2,"days":[{"d":1,"focus":"LOWER FOCUSED FULL BODY","ex":[{"n":"[TOPSET] BACK SQUAT","ws":"1","r":"2","rpe":"92.5%","rest":"2-4 MIN","note":"SIT BACK AND DOWN, 15\u00b0 TOE FLARE, DRIVE YOUR KNEES OUT LATERALLY","mz":{"quads":1.0,"glutes":1.0,"hamstrings":0.5}},{"n":"[BACK OFF] BACK SQUAT","ws":"2","r":"2","rpe":"85%","rest":"2-4 MIN","note":"SIT BACK AND DOWN, 15\u00b0 TOE FLARE, DRIVE YOUR KNEES OUT LATERALLY","mz":{"quads":1.0,"glutes":1.0,"hamstrings":0.5}},{"n":"BARBELL OVERHEAD PRESS","ws":"4","r":"5","rpe":"80%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1.0,"triceps":0.5}},{"n":"SWISS BALL LEG CURL","ws":"3","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"PREVENT YOUR HIPS FROM TOUCHING THE GROUND. DIG YOUR HEELS INTO THE BALL","mz":{"hamstrings":1.0}},{"n":"CHIN-UP","ws":"4","r":"8","rpe":"RPE8","rest":"2-3 MIN","note":"SUPINATED (UNDERHAND) SHOULDER WIDTH GRIP, PULL WITH LATS","mz":{"back":1.0,"biceps":1.0}},{"n":"SUPINATED EZ BAR CURL","ws":"3","r":"10+2","rpe":"RPE10","rest":"1-2 MIN","note":"10 REPS WITH GOOD CONTROL + 2 REPS WITH MODERATE CHEATING/MOMENTUM","mz":{"biceps":1.0}},{"n":"AB WHEEL ROLLOUT","ws":"3","r":"12","rpe":"RPE8","rest":"1-2 MIN","note":"SQUEEZE YOUR GLUTES, DON'T PULL FROM YOUR ARMS","mz":{"abs":1.0}}]},{"d":2,"focus":"CHEST FOCUSED FULL BODY","ex":[{"n":"BARBELL BENCH PRESS","ws":"4","r":"2","rpe":"90%","rest":"2-4 MIN","note":"ELBOWS AT A 45\u00b0 ANGLE. SQUEEZE YOUR SHOULDER BLADES AND STAY FIRM ON THE BENCH","mz":{"chest":1.0,"triceps":0.5,"shoulders":0.5}},{"n":"LOW INCLINE DUMBBELL PRESS","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"15\u00b0 BENCH ANGLE. TUCK YOUR ELBOWS","mz":{"chest":1.0,"triceps":0.5}},{"n":"BARBELL HIP THRUST OR ROMANIAN DEADLIFT","ws":"4","r":"12","rpe":"RPE8","rest":"2-3 MIN","note":"HIP THRUST IF GLUTES ARE PRIORITY, RDL IF HAMSTRINGS ARE PRIORITY FOR YOU. FOCUS ON MIND MUSCLE CONNECTION.","mz":{"glutes":1.0,"hamstrings":1.0}},{"n":"DUMBBELL ROW","ws":"4","r":"12","rpe":"RPE8","rest":"1-3 MIN","note":"PULL THE DUMBBELL TO YOUR HIP","mz":{"back":1.0,"biceps":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"4","r":"15","rpe":"RPE8","rest":"1-3 MIN","note":"RAISE THE DUMBBELL \"OUT\" NOT \"UP\", MIND MUSCLE CONNECTION WITH MIDDLE FIBERS","mz":{"shoulders":1.0}},{"n":"OVERHEAD TRICEP EXTENSION","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR TRICEPS TO MOVE THE WEIGHT","mz":{"triceps":1.0}},{"n":"HEX BAR OR SMITH MACHINE SHRUG","ws":"3","r":"12","rpe":"RPE8","rest":"1-2 MIN","note":"SHRUG UP AND IN, PULL SHOULDERS UP TO EARS!","mz":{"back":1.0,"shoulders":0.5}}]},{"d":3,"focus":"BACK FOCUSED FULL BODY","ex":[{"n":"WEIGHTED PULL-UP","ws":"4","r":"6","rpe":"RPE9","rest":"2-3 MIN","note":"1.5X SHOULDER WIDTH GRIP, PULL YOUR CHEST TO THE BAR","mz":{"back":1.0,"biceps":1.0}},{"n":"BANDED CHEST- SUPPORTED T-BAR ROW","ws":"4","r":"10","rpe":"RPE8","rest":"2-3 MIN","note":"BE EXPLOSIVE AT THE BOTTOM, DRIVE ELBOWS BACK HARD!","mz":{"back":1.0,"biceps":0.5}},{"n":"SINGLE-LEG LEG PRESS","ws":"4","r":"15","rpe":"RPE8","rest":"2-3 MIN","note":"LOW/MEDIUM/HIGH FOOT PLACEMENT, DON'T ALLOW YOUR LOWER BACK TO ROUND","mz":{"quads":1.0,"glutes":0.5}},{"n":"ECCENTRIC- ACCENTUATED STANDING CALF RAISE","ws":"4","r":"8","rpe":"RPE8","rest":"1-2 MIN","note":"PRESS ONTO YOUR TOES. 4-SECOND ECCENTRIC","mz":{"calves":1.0}},{"n":"CABLE ROPE UPRIGHT ROW","ws":"4","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING THE UPPER TRAPS AT THE TOP","mz":{"shoulders":1.0,"back":0.5}},{"n":"CABLE SINGLE-ARM CURL","ws":"4","r":"8","rpe":"RPE8","rest":"1-2 MIN","note":"KEEP YOUR SHOULDER JOINT HYPEREXTENDED (ELBOW BEHIND TORSO)","mz":{"biceps":1.0}}]},{"d":4,"focus":"LOWER FOCUSED FULL BODY 2","ex":[{"n":"[TOPSET] DEADLIFT","ws":"1","r":"2","rpe":"95%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1.0,"hamstrings":1.0,"glutes":1.0}},{"n":"[BACK OFF] RESET DEADLIFT","ws":"1","r":"3","rpe":"85%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1.0,"hamstrings":1.0,"glutes":1.0}},{"n":"DECLINE BENCH PRESS","ws":"4","r":"8","rpe":"RPE 8","rest":"2-3 MIN","note":"CONSTANT TENSION REPS, TOUCH BAR TO CHEST","mz":{"chest":1.0,"triceps":0.5}},{"n":"GLUTE HAM RAISE","ws":"4","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"KEEP LOWER BACK STRAIGHT, USE HAMSTRINGS TO CURL YOUR BODY UP","mz":{"hamstrings":1.0,"glutes":0.5}},{"n":"LEG EXTENSION","ws":"4","r":"12","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR QUADS TO MOVE THE WEIGHT","mz":{"quads":1.0}},{"n":"CABLE PULL-OVER","ws":"3","r":"15","rpe":"RPE8","rest":"1-3 MIN","note":"LEAN YOUR TORSO AT A 45\u00b0 ANGLE, FOCUS ON PULLING THE WEIGHT STRAIGHT DOWN, NOT \"IN\"","mz":{"back":1.0,"chest":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"3","r":"20","rpe":"RPE8","rest":"1-2 MIN","note":"RAISE THE DUMBBELL \"OUT\" NOT \"UP\", MIND MUSCLE CONNECTION WITH MIDDLE FIBERS","mz":{"shoulders":1.0}},{"n":"REVERSE PEC DECK","ws":"3","r":"20","rpe":"RPE8","rest":"1-2 MIN","note":"SWING THE WEIGHT \"OUT\", NOT \"BACK\"","mz":{"shoulders":1.0,"back":0.5}},{"n":"EZ BAR SKULL CRUSHER","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"ARC THE BAR BACK BEHIND YOUR HEAD, KEEP CONSTANT TENSION ON TRICEPS","mz":{"triceps":1.0}}]},{"d":5,"focus":"DELTOID FOCUSED FULL BODY","ex":[{"n":"OVERHEAD PRESS","ws":"5","r":"3","rpe":"87.5%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1.0,"triceps":0.5}},{"n":"CABLE LATERAL RAISE","ws":"3","r":"8","rpe":"RPE8","rest":"1-2 MIN","note":"SWING THE WEIGHT \"OUT\", NOT \"UP\"","mz":{"shoulders":1.0}},{"n":"PENDLAY ROW","ws":"4","r":"12","rpe":"RPE8","rest":"1-3 MIN","note":"KEEP A FLAT BACK, PULL YOUR ELBOWS BACK AT 45 DEGREE ANGLE","mz":{"back":1.0,"biceps":0.5}},{"n":"SEATED HIP ABDUCTION","ws":"4","r":"20","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON DRIVING YOUR KNEES OUT","mz":{"glutes":1.0}},{"n":"EZ BAR CURL 21S","ws":"2","r":"7/7/7","rpe":"RPE8","rest":"1-2 MIN","note":"FIRST 7 REPS BOTTOM HALF OF ROM, NEXT 7 REPS TOP HALF OF ROM, LAST 7 REPS FULL ROM","mz":{"biceps":1.0,"forearms":0.5}},{"n":"CABLE CRUNCH","ws":"4","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON FLEXING YOUR SPINE. AVOID YANKING WITH YOUR ARMS","mz":{"abs":1.0}},{"n":"STANDING CALF RAISE","ws":"4","r":"12","rpe":"RPE8","rest":"1-2 MIN","note":"1-2 SECOND PAUSE AT THE BOTTOM OF EACH REP","mz":{"calves":1.0}},{"n":"PUSH UP","ws":"2","r":"RPE ONLY","rpe":"RPE7","rest":"1-2 MIN","note":"PERFORM AS MANY REPS AS YOU CAN TO HIT TARGET RPE","mz":{"chest":1.0,"triceps":0.5}}]}]}]}],"MUSCLE_MAP":{"AB WHEEL ROLLOUT":{"abs":1.0},"ARNOLD PRESS":{"shoulders":1.0,"triceps":0.5},"BACK SQUAT":{"quads":1.0,"glutes":1.0,"hamstrings":0.5},"BANDED CHEST- SUPPORTED T-BAR ROW":{"back":1.0,"biceps":0.5},"BARBELL BENCH PRESS":{"chest":1.0,"triceps":0.5,"shoulders":0.5},"BARBELL HIP THRUST OR ROMANIAN DEADLIFT":{"glutes":1.0,"hamstrings":1.0},"BARBELL OVERHEAD PRESS":{"shoulders":1.0,"triceps":0.5},"BICYCLE CRUNCH":{"abs":1.0},"CABLE CRUNCH":{"abs":1.0},"CABLE LATERAL RAISE":{"shoulders":1.0},"CABLE PULL-OVER":{"back":1.0,"chest":0.5},"CABLE ROPE UPRIGHT ROW":{"shoulders":1.0,"back":0.5},"CABLE SEATED ROW":{"back":1.0,"biceps":0.5},"CABLE SINGLE-ARM CURL":{"biceps":1.0},"CHEST-SUPPORTED T-BAR ROW":{"back":1.0,"biceps":0.5},"CHIN-UP":{"back":1.0,"biceps":1.0},"DEADLIFT":{"back":1.0,"hamstrings":1.0,"glutes":1.0},"DECLINE BENCH PRESS":{"chest":1.0,"triceps":0.5},"DIP":{"chest":1.0,"triceps":1.0},"DUMBBELL INCLINE PRESS":{"chest":1.0,"shoulders":0.5,"triceps":0.5},"DUMBBELL LATERAL RAISE":{"shoulders":1.0},"DUMBBELL ROW":{"back":1.0,"biceps":0.5},"ECCENTRIC- ACCENTUATED STANDING CALF RAISE":{"calves":1.0},"EGYPTIAN LATERAL RAISE":{"shoulders":1.0},"EZ BAR CURL 21S":{"biceps":1.0,"forearms":0.5},"EZ BAR SKULL CRUSHER":{"triceps":1.0},"GLUTE HAM RAISE":{"hamstrings":1.0,"glutes":0.5},"HAMMER CURL":{"biceps":1.0,"forearms":1.0},"HANGING LEG RAISE":{"abs":1.0},"HEX BAR OR SMITH MACHINE SHRUG":{"back":1.0,"shoulders":0.5},"HUMBLE ROW":{"back":1.0,"biceps":0.5},"INCLINE DUMBBELL CURL":{"biceps":1.0},"LEG EXTENSION":{"quads":1.0},"LEG PRESS":{"quads":1.0,"glutes":0.5},"LOW INCLINE DUMBBELL PRESS":{"chest":1.0,"triceps":0.5},"LOW TO HIGH CABLE FLYE":{"chest":1.0},"LYING LEG CURL":{"hamstrings":1.0},"OVERHEAD PRESS":{"shoulders":1.0,"triceps":0.5},"OVERHEAD TRICEP EXTENSION":{"triceps":1.0},"PENDLAY ROW":{"back":1.0,"biceps":0.5},"PRONATED PULLDOWN":{"back":1.0,"biceps":0.5},"PUSH UP":{"chest":1.0,"triceps":0.5},"RESET DEADLIFT":{"back":1.0,"hamstrings":1.0,"glutes":1.0},"REVERSE PEC DECK":{"shoulders":1.0,"back":0.5},"ROPE FACE PULL":{"shoulders":1.0,"back":0.5},"SEATED HIP ABDUCTION":{"glutes":1.0},"SINGLE-LEG LEG PRESS":{"quads":1.0,"glutes":0.5},"STANDING CALF RAISE":{"calves":1.0},"SUPINATED EZ BAR CURL":{"biceps":1.0},"SWISS BALL LEG CURL":{"hamstrings":1.0},"TRICEP PRESSDOWN":{"triceps":1.0},"WEIGHTED PULL-UP":{"back":1.0,"biceps":1.0},"[BACK OFF] BACK SQUAT":{"quads":1.0,"glutes":1.0,"hamstrings":0.5},"[TOPSET] BACK SQUAT":{"quads":1.0,"glutes":1.0,"hamstrings":0.5},"[BACK OFF] RESET DEADLIFT":{"back":1.0,"hamstrings":1.0,"glutes":1.0},"[TOPSET] DEADLIFT":{"back":1.0,"hamstrings":1.0,"glutes":1.0}},"ZONES":["chest","back","shoulders","biceps","triceps","quads","hamstrings","glutes","calves","abs","forearms"]};
@@ -11,38 +11,22 @@ const BODY_VB = {"maleFront":"0 0 724 1448","maleBack":"724 0 724 1448","femaleF
 
 
 // ============ STORAGE ============
-const STORAGE = (typeof window !== "undefined" && window.storage) ? window.storage : null;
-
-// Wrap a promise so it can never hang forever. If the underlying storage
-// call never resolves (a dead backend, not just a slow one), we give up
-// after STORAGE_TIMEOUT_MS and move on with the fallback instead of
-// blocking the app indefinitely. The original promise is simply abandoned
-// in the background — if it eventually does resolve, nothing is listening,
-// so it can't clobber anything.
-const STORAGE_TIMEOUT_MS = 6000;
-function withTimeout(promise, ms) {
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error("storage call timed out")), ms);
-    promise.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
-  });
-}
-async function loadJSON(key, fallback) {
-  if (!STORAGE) return { value: fallback, timedOut: false };
+// Plain browser localStorage — synchronous, instant, fully offline. No
+// network round trip, no loading screens, no race conditions to guard
+// against. saveJSON stays async-shaped only so call sites read naturally
+// inside useEffect; it resolves immediately either way.
+const STORAGE_KEY_PREFIX = "theforge:";
+function readLocal(key, fallback) {
   try {
-    const r = await withTimeout(STORAGE.get(key, false), STORAGE_TIMEOUT_MS);
-    return { value: r ? JSON.parse(r.value) : fallback, timedOut: false };
+    const raw = window.localStorage.getItem(STORAGE_KEY_PREFIX + key);
+    return raw !== null ? JSON.parse(raw) : fallback;
   } catch (e) {
-    // A genuine "key doesn't exist yet" miss is fine to treat as a clean
-    // fallback. A timeout means we never actually heard back — saving
-    // anything in that case risks overwriting real data that storage just
-    // hadn't returned yet, so callers must know which one happened.
-    const timedOut = !!(e && e.message === "storage call timed out");
-    return { value: fallback, timedOut };
+    console.error("load failed", key, e);
+    return fallback;
   }
 }
 async function saveJSON(key, value) {
-  if (!STORAGE) return;
-  try { await withTimeout(STORAGE.set(key, JSON.stringify(value), false), STORAGE_TIMEOUT_MS); }
+  try { window.localStorage.setItem(STORAGE_KEY_PREFIX + key, JSON.stringify(value)); }
   catch (e) { console.error("save failed", key, e); }
 }
 function todayKey() {
@@ -64,125 +48,57 @@ function pKey(profileId, base) { return `p:${profileId}:${base}`; }
 
 // ============ APP ROOT ============
 export default function App() {
-  // `dataReady` is the ONLY thing that gates both the loading screen and
-  // writes back to storage. It becomes true exactly once, when the real
-  // load has genuinely finished — never faked early. On a device with a lot
-  // of accumulated history, storage can legitimately take several seconds;
-  // showing a "ready" UI before the real data arrives is what caused data
-  // loss before, so we just keep the spinner up instead, with a friendly
-  // "still working" message if it runs long, and a manual retry only if it
-  // looks genuinely stuck.
-  const [dataReady, setDataReady] = useState(false);
-  const [canSave, setCanSave] = useState(false); // false if any load had to give up via timeout
-  const [slowLoad, setSlowLoad] = useState(false);
-  const [loadStuck, setLoadStuck] = useState(false);
-  const [profiles, setProfiles] = useState([]);
-  const [activeProfileId, setActiveProfileId] = useState(null);
-  const [plans, setPlans] = useState([]); // shared library
+  // localStorage is synchronous, so there's no real "loading" period and no
+  // network failure modes to guard against — this just reads once on first
+  // render. Self-heal still runs once in case the builtin plan list is
+  // ever out of sync with a saved plan array.
+  const [profiles, setProfiles] = useState(() => {
+    const pf = readLocal("profiles", []);
+    return Array.isArray(pf) ? pf : [];
+  });
+  const [activeProfileId, setActiveProfileId] = useState(() => readLocal("activeProfileId", null));
+  const [plans, setPlans] = useState(() => {
+    const saved = readLocal("plans", null);
+    const arr = Array.isArray(saved) ? saved : [];
+    const builtinIds = new Set(BUILTIN_PLANS.map((b) => b.id));
+    const userPlans = arr.filter((p) => p && !p.builtin && !builtinIds.has(p.id));
+    return [...BUILTIN_PLANS, ...userPlans];
+  });
 
+  useEffect(() => { saveJSON("profiles", profiles); }, [profiles]);
+  useEffect(() => { saveJSON("activeProfileId", activeProfileId); }, [activeProfileId]);
+  useEffect(() => { saveJSON("plans", plans); }, [plans]);
+
+  // Self-heal: if the builtin plans are somehow missing, restore them.
   useEffect(() => {
-    let done = false;
-    const slowTimer = setTimeout(() => { if (!done) setSlowLoad(true); }, 4000);
-    const stuckTimer = setTimeout(() => { if (!done) setLoadStuck(true); }, 15000);
-    (async () => {
-      try {
-        const [pf, ap, pl] = await Promise.all([
-          loadJSON("profiles", []),
-          loadJSON("activeProfileId", null),
-          loadJSON("plans", null),
-        ]);
-        setProfiles(pf.value);
-        setActiveProfileId(ap.value);
-        // Seed shared library with builtin plans on first run
-        // Builtin plans are authoritative: drop any saved copy and re-add the
-        // current definition, keeping only user-created (non-builtin) saved plans.
-        const saved = Array.isArray(pl.value) ? pl.value : [];
-        const builtinIds = new Set(BUILTIN_PLANS.map((b) => b.id));
-        const userPlans = saved.filter((p) => p && !p.builtin && !builtinIds.has(p.id));
-        const merged = [...BUILTIN_PLANS, ...userPlans];
-        setPlans(merged);
-        // If ANY of these had to give up via timeout (not a clean miss), we
-        // never heard back from the real storage value — refuse to save
-        // anything this session so we can't overwrite data that may still
-        // be sitting there correctly, just slow to arrive.
-        setCanSave(!pf.timedOut && !ap.timedOut && !pl.timedOut);
-      } catch (e) { console.error(e); setCanSave(false); }
-      finally { done = true; clearTimeout(slowTimer); clearTimeout(stuckTimer); setDataReady(true); }
-    })();
-    return () => { clearTimeout(slowTimer); clearTimeout(stuckTimer); };
-  }, []);
-
-  useEffect(() => { if (dataReady && canSave) saveJSON("profiles", profiles); }, [profiles, dataReady, canSave]);
-  useEffect(() => { if (dataReady && canSave) saveJSON("activeProfileId", activeProfileId); }, [activeProfileId, dataReady, canSave]);
-  useEffect(() => { if (dataReady && canSave) saveJSON("plans", plans); }, [plans, dataReady, canSave]);
-
-  // Self-heal: if loading finished but the builtin plans are somehow
-  // missing, restore them automatically. No button required.
-  useEffect(() => {
-    if (!dataReady) return;
     const builtinIds = new Set(BUILTIN_PLANS.map((b) => b.id));
     const hasAllBuiltins = BUILTIN_PLANS.every((b) => plans.some((p) => p.id === b.id));
     if (!hasAllBuiltins) {
       const userPlans = plans.filter((p) => p && !p.builtin && !builtinIds.has(p.id));
       setPlans([...BUILTIN_PLANS, ...userPlans]);
     }
-  }, [dataReady, plans]);
+  }, [plans]);
 
-  if (!dataReady) {
-    return (
-      <div style={styles.loadingScreen}>
-        <div style={{ textAlign: "center" }}>
-          <div style={styles.loadingText}>loading…</div>
-          {slowLoad && !loadStuck && (
-            <div style={{ ...styles.loadingText, fontSize: 12, marginTop: 8, opacity: 0.7 }}>
-              Still loading your saved data, hang tight
-            </div>
-          )}
-          {loadStuck && (
-            <div style={{ marginTop: 16 }}>
-              <div style={{ ...styles.loadingText, fontSize: 12, marginBottom: 10 }}>
-                This is taking longer than expected.
-              </div>
-              <button style={styles.primaryButtonSm} onClick={() => window.location.reload()}>Reload</button>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
 
   const activeProfile = profiles.find((p) => p.id === activeProfileId) || null;
-
-  const offlineBanner = !canSave ? (
-    <div style={styles.offlineBanner}>
-      Couldn't reach your saved data this time, using a temporary view so nothing gets overwritten. Changes won't be saved until storage is reachable again — try fully closing and reopening.
-    </div>
-  ) : null;
 
   // No profile chosen yet -> profile gate
   if (!activeProfile) {
     return (
-      <>
-        {offlineBanner}
-        <ProfileGate
-          profiles={profiles} setProfiles={setProfiles}
-          onPick={(id) => setActiveProfileId(id)}
-        />
-      </>
+      <ProfileGate
+        profiles={profiles} setProfiles={setProfiles}
+        onPick={(id) => setActiveProfileId(id)}
+      />
     );
   }
 
   return (
-    <>
-      {offlineBanner}
-      <Main
-        profile={activeProfile}
-        profiles={profiles} setProfiles={setProfiles}
-        canSave={canSave}
-        plans={plans} setPlans={setPlans}
-        onSwitchProfile={() => setActiveProfileId(null)}
-      />
-    </>
+    <Main
+      profile={activeProfile}
+      profiles={profiles} setProfiles={setProfiles}
+      plans={plans} setPlans={setPlans}
+      onSwitchProfile={() => setActiveProfileId(null)}
+    />
   );
 }
 
@@ -234,60 +150,35 @@ function ProfileGate({ profiles, setProfiles, onPick }) {
 }
 
 // ============ MAIN (per active profile) ============
-function Main({ profile, profiles, setProfiles, plans, setPlans, onSwitchProfile, canSave: appCanSave }) {
+function Main({ profile, profiles, setProfiles, plans, setPlans, onSwitchProfile }) {
   const [tab, setTab] = useState("home");
-  // dataReady only flips on genuine load completion, never faked early —
-  // see App's loader for why. Switching profiles resets it so the loading
-  // screen reappears honestly while the new profile's data comes in.
-  const [dataReady, setDataReady] = useState(false);
-  const [canSave, setCanSave] = useState(false);
-  const [slowLoad, setSlowLoad] = useState(false);
-  const [loadStuck, setLoadStuck] = useState(false);
-
-  const [targets, setTargets] = useState(profile.targets || DEFAULT_TARGETS);
-  const [myFoods, setMyFoods] = useState([]);
-  const [dayLog, setDayLog] = useState({});
-  const [weights, setWeights] = useState([]);
-  const [usdaKey, setUsdaKey] = useState("");
-  const [workoutLogs, setWorkoutLogs] = useState({});
-
   const pid = profile.id;
   const today = todayKey();
-  // Never write if either this profile's own load OR the outer App-level
-  // load had to give up via timeout — a partial "safe to save" isn't safe.
-  const safeToSave = canSave && appCanSave;
 
+  // localStorage is synchronous — read once per profile on mount/switch,
+  // no async load, no timeouts, no race conditions.
+  const [targets, setTargets] = useState(profile.targets || DEFAULT_TARGETS);
+  const [myFoods, setMyFoods] = useState(() => readLocal(pKey(pid, "myFoods"), []));
+  const [dayLog, setDayLog] = useState(() => readLocal(pKey(pid, "dayLog"), {}));
+  const [weights, setWeights] = useState(() => readLocal(pKey(pid, "weights"), []));
+  const [usdaKey, setUsdaKey] = useState(() => readLocal("usdaKey", ""));
+  const [workoutLogs, setWorkoutLogs] = useState(() => readLocal(pKey(pid, "workoutLogs"), {}));
+
+  // If the active profile changes, re-read that profile's own data fresh.
   useEffect(() => {
-    setDataReady(false);
-    setCanSave(false);
-    setSlowLoad(false);
-    setLoadStuck(false);
-    let done = false;
-    const slowTimer = setTimeout(() => { if (!done) setSlowLoad(true); }, 4000);
-    const stuckTimer = setTimeout(() => { if (!done) setLoadStuck(true); }, 15000);
-    (async () => {
-      try {
-        const [mf, dl, wt, uk, wl] = await Promise.all([
-          loadJSON(pKey(pid, "myFoods"), []),
-          loadJSON(pKey(pid, "dayLog"), {}),
-          loadJSON(pKey(pid, "weights"), []),
-          loadJSON("usdaKey", ""), // key shared across profiles (same device)
-          loadJSON(pKey(pid, "workoutLogs"), {}),
-        ]);
-        setMyFoods(mf.value); setDayLog(dl.value); setWeights(wt.value); setUsdaKey(uk.value); setWorkoutLogs(wl.value);
-        setTargets(profile.targets || DEFAULT_TARGETS);
-        setCanSave(!mf.timedOut && !dl.timedOut && !wt.timedOut && !uk.timedOut && !wl.timedOut);
-      } catch (e) { console.error(e); setCanSave(false); }
-      finally { done = true; clearTimeout(slowTimer); clearTimeout(stuckTimer); setDataReady(true); }
-    })();
-    return () => { clearTimeout(slowTimer); clearTimeout(stuckTimer); };
+    setTargets(profile.targets || DEFAULT_TARGETS);
+    setMyFoods(readLocal(pKey(pid, "myFoods"), []));
+    setDayLog(readLocal(pKey(pid, "dayLog"), {}));
+    setWeights(readLocal(pKey(pid, "weights"), []));
+    setUsdaKey(readLocal("usdaKey", ""));
+    setWorkoutLogs(readLocal(pKey(pid, "workoutLogs"), {}));
   }, [pid]);
 
-  useEffect(() => { if (dataReady && safeToSave) saveJSON(pKey(pid, "myFoods"), myFoods); }, [myFoods, dataReady, safeToSave, pid]);
-  useEffect(() => { if (dataReady && safeToSave) saveJSON(pKey(pid, "dayLog"), dayLog); }, [dayLog, dataReady, safeToSave, pid]);
-  useEffect(() => { if (dataReady && safeToSave) saveJSON(pKey(pid, "weights"), weights); }, [weights, dataReady, safeToSave, pid]);
-  useEffect(() => { if (dataReady && safeToSave) saveJSON("usdaKey", usdaKey); }, [usdaKey, dataReady, safeToSave]);
-  useEffect(() => { if (dataReady && safeToSave) saveJSON(pKey(pid, "workoutLogs"), workoutLogs); }, [workoutLogs, dataReady, safeToSave, pid]);
+  useEffect(() => { saveJSON(pKey(pid, "myFoods"), myFoods); }, [myFoods, pid]);
+  useEffect(() => { saveJSON(pKey(pid, "dayLog"), dayLog); }, [dayLog, pid]);
+  useEffect(() => { saveJSON(pKey(pid, "weights"), weights); }, [weights, pid]);
+  useEffect(() => { saveJSON("usdaKey", usdaKey); }, [usdaKey]);
+  useEffect(() => { saveJSON(pKey(pid, "workoutLogs"), workoutLogs); }, [workoutLogs, pid]);
 
   // persist target edits back onto the profile record
   function updateTargets(t) {
@@ -322,37 +213,9 @@ function Main({ profile, profiles, setProfiles, plans, setPlans, onSwitchProfile
     });
   }
 
-  if (!dataReady) {
-    return (
-      <div style={styles.loadingScreen}>
-        <div style={{ textAlign: "center" }}>
-          <div style={styles.loadingText}>loading…</div>
-          {slowLoad && !loadStuck && (
-            <div style={{ ...styles.loadingText, fontSize: 12, marginTop: 8, opacity: 0.7 }}>
-              Still loading your saved data, hang tight
-            </div>
-          )}
-          {loadStuck && (
-            <div style={{ marginTop: 16 }}>
-              <div style={{ ...styles.loadingText, fontSize: 12, marginBottom: 10 }}>
-                This is taking longer than expected.
-              </div>
-              <button style={styles.primaryButtonSm} onClick={() => window.location.reload()}>Reload</button>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div style={styles.app}>
       <style>{globalCss}</style>
-      {!safeToSave && (
-        <div style={styles.offlineBanner}>
-          Couldn't reach your saved data this time, using a temporary view so nothing gets overwritten. Changes won't be saved until storage is reachable again.
-        </div>
-      )}
       <TopBar profile={profile} onSwitchProfile={onSwitchProfile} />
       <div style={styles.content}>
         {tab === "home" && (
@@ -423,7 +286,6 @@ function TrainHome({ profile, plans, setPlans, setActivePlan, workoutLogs, logEx
         onNew={() => { setEditingPlanId(null); setScreen("builder"); }}
         onEdit={(id) => { setEditingPlanId(id); setScreen("builder"); }}
         onDelete={(id) => setPlans((prev) => prev.filter((p) => p.id !== id))}
-        onResetPlans={() => setPlans(BUILTIN_PLANS)}
       />
     );
   }
@@ -454,18 +316,9 @@ function TrainHome({ profile, plans, setPlans, setActivePlan, workoutLogs, logEx
 }
 
 // ============ PLAN LIBRARY ============
-function PlanLibrary({ plans, activePlanId, onSelect, onNew, onEdit, onDelete, onResetPlans }) {
-  const builtinCount = (typeof BUILTIN_PLANS !== "undefined" && Array.isArray(BUILTIN_PLANS)) ? BUILTIN_PLANS.length : -1;
+function PlanLibrary({ plans, activePlanId, onSelect, onNew, onEdit, onDelete }) {
   return (
     <div style={styles.tabContent}>
-      <div style={styles.diagBox}>
-        BUILD v11 · plans loaded: {plans.length} · BUILTIN_PLANS in this bundle: {builtinCount}
-        {plans.length === 0 && (
-          <div style={{ marginTop: 8 }}>
-            <button style={styles.primaryButtonSm} onClick={onResetPlans}>Force-reload default plans</button>
-          </div>
-        )}
-      </div>
       <div style={styles.screenHeader}>
         <div style={styles.screenTitle}>Plan Library</div>
         <button style={styles.primaryButtonSm} onClick={onNew}><Plus size={15} style={{ verticalAlign: "-2px" }} /> New plan</button>
@@ -506,11 +359,14 @@ function PlanLibrary({ plans, activePlanId, onSelect, onNew, onEdit, onDelete, o
 // ============ PLAN BUILDER / EDITOR ============
 function PlanBuilder({ existing, createdBy, onCancel, onSave }) {
   const [name, setName] = useState(existing?.name || "");
+  const wasWeekStructured = existing?.structure === "weeks";
   // builder works in flat "days" structure
   const [days, setDays] = useState(() => {
     if (existing?.structure === "days") return existing.days.map((d) => ({ ...d, ex: d.ex.map((e) => ({ ...e })) }));
     if (existing?.structure === "weeks") {
-      // editing a week-based plan: flatten week 1 as a starting template
+      // Editing a week-based plan: only week 1 is used as a starting
+      // template, and saving converts it to a single repeating day-based
+      // plan. Weeks 2+ are NOT carried over — see the warning banner below.
       return existing.weeks[0].days.map((d) => ({ ...d, ex: d.ex.map((e) => ({ ...e })) }));
     }
     return [{ d: 1, focus: "", ex: [] }];
@@ -556,6 +412,11 @@ function PlanBuilder({ existing, createdBy, onCancel, onSave }) {
     <div style={styles.tabContent}>
       <button style={styles.backRow} onClick={onCancel}><ArrowLeft size={18} /> Library</button>
       <div style={styles.screenTitle}>{existing ? "Edit Plan" : "New Plan"}</div>
+      {wasWeekStructured && (
+        <div style={styles.warningBanner}>
+          This plan has multiple weeks. Editing here only keeps week 1 as a starting point — saving will turn it into a single repeating day-based plan, and weeks 2 and beyond will be discarded. Cancel now if you wanted to keep the full multi-week version.
+        </div>
+      )}
       <input style={styles.input} placeholder="Plan name (e.g. Anna's Upper/Lower)" value={name} onChange={(e) => setName(e.target.value)} />
 
       {days.map((day, di) => (
@@ -605,7 +466,7 @@ function PlanBuilder({ existing, createdBy, onCancel, onSave }) {
         <button style={{ ...styles.primaryButton, flex: 1 }} onClick={save}>Save plan</button>
         <button style={styles.secondaryButton} onClick={onCancel}>Cancel</button>
       </div>
-      <div style={styles.helpNote}>Muscle tags drive the body heatmap (coming next). Tag what each exercise hits.</div>
+      <div style={styles.helpNote}>Muscle tags drive the body heatmap. Tag what each exercise hits.</div>
     </div>
   );
 }
@@ -885,18 +746,27 @@ async function lookupBarcode(code, usdaKey) {
 function AddFoodModal({ sectionLabel, myFoods, usdaKey, setUsdaKey, onClose, onAdd }) {
   const [mode, setMode] = useState(myFoods.length > 0 ? "myfoods" : "search");
   const [query, setQuery] = useState(""); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
   const [selected, setSelected] = useState(null); const [servings, setServings] = useState(1); const [keyInput, setKeyInput] = useState(usdaKey);
   async function runSearch() {
-    if (!query.trim()) return; setSearching(true); setResults([]);
+    if (!query.trim()) return; setSearching(true); setResults([]); setSearchError("");
     try {
       const res = await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${encodeURIComponent(usdaKey)}&query=${encodeURIComponent(query)}&pageSize=15`);
+      if (!res.ok) {
+        if (res.status === 403 || res.status === 401) setSearchError("USDA rejected this API key. Double-check it and save it again.");
+        else if (res.status === 429) setSearchError("Too many USDA requests right now — wait a bit and try again.");
+        else setSearchError(`USDA search failed (${res.status}). Try again in a moment.`);
+        return;
+      }
       const data = await res.json();
       const mapped = (data.foods || []).map((f) => { const nut = (n) => { const x = f.foodNutrients?.find((y) => y.nutrientName === n); return x ? x.value : 0; }; return { name: f.description, calories: nut("Energy"), protein: nut("Protein"), carbs: nut("Carbohydrate, by difference"), fat: nut("Total lipid (fat)"), servingNote: f.servingSize ? `${f.servingSize}${f.servingSizeUnit || ""}` : "100g (est)" }; });
       setResults(mapped);
-    } catch (e) { console.error(e); } finally { setSearching(false); }
+      if (mapped.length === 0) setSearchError("No matches found for that search.");
+    } catch (e) { console.error(e); setSearchError("Couldn't reach USDA — check your internet connection."); }
+    finally { setSearching(false); }
   }
   function selectFood(f) { setSelected(f); setServings(1); }
-  function confirmAdd(save) { if (!selected) return; onAdd({ name: selected.name, calories: selected.calories * servings, protein: selected.protein * servings, carbs: selected.carbs * servings, fat: selected.fat * servings }, save); }
+  function confirmAdd(save) { if (!selected || !(servings > 0)) return; onAdd({ name: selected.name, calories: selected.calories * servings, protein: selected.protein * servings, carbs: selected.carbs * servings, fat: selected.fat * servings }, save); }
   return (
     <div style={styles.modalOverlay} onClick={onClose}>
       <div style={styles.modalSheet} onClick={(e) => e.stopPropagation()}>
@@ -905,9 +775,10 @@ function AddFoodModal({ sectionLabel, myFoods, usdaKey, setUsdaKey, onClose, onA
           <div style={{ padding: "4px 0" }}>
             <div style={styles.foodName}>{selected.name}</div>
             <div style={{ ...styles.dimLabel, marginBottom: 12 }}>{selected.servingNote || "per serving"}</div>
-            <div style={styles.fieldRow}><label style={styles.fieldLabel}>Servings</label><input type="number" step="0.25" value={servings} onChange={(e) => setServings(Number(e.target.value) || 0)} style={styles.input} /></div>
+            <div style={styles.fieldRow}><label style={styles.fieldLabel}>Servings</label><input type="number" step="0.25" min="0.25" value={servings} onChange={(e) => setServings(Math.max(0, Number(e.target.value) || 0))} style={styles.input} /></div>
             <div style={{ display: "flex", gap: 16, margin: "12px 0", fontSize: 13, color: COLORS.textDim }}><span>{Math.round(selected.calories * servings)} cal</span><span>P{Math.round(selected.protein * servings)}</span><span>C{Math.round(selected.carbs * servings)}</span><span>F{Math.round(selected.fat * servings)}</span></div>
-            <div style={{ display: "flex", gap: 8 }}><button style={styles.primaryButton} onClick={() => confirmAdd(false)}>Add</button><button style={styles.secondaryButton} onClick={() => confirmAdd(true)}>Add &amp; save</button></div>
+            {!(servings > 0) && <div style={{ ...styles.dimLabel, color: COLORS.amber, marginBottom: 8 }}>Enter a serving amount greater than 0.</div>}
+            <div style={{ display: "flex", gap: 8 }}><button style={{ ...styles.primaryButton, opacity: servings > 0 ? 1 : 0.5 }} disabled={!(servings > 0)} onClick={() => confirmAdd(false)}>Add</button><button style={{ ...styles.secondaryButton, opacity: servings > 0 ? 1 : 0.5 }} disabled={!(servings > 0)} onClick={() => confirmAdd(true)}>Add &amp; save</button></div>
             <button style={{ ...styles.linkButton, marginTop: 10 }} onClick={() => setSelected(null)}>Back</button>
           </div>
         ) : (
@@ -915,7 +786,7 @@ function AddFoodModal({ sectionLabel, myFoods, usdaKey, setUsdaKey, onClose, onA
             <div style={styles.modeSwitch}>{["myfoods", "scan", "search", "custom"].map((m) => (<button key={m} style={{ ...styles.modeButton, ...(mode === m ? styles.modeButtonActive : {}) }} onClick={() => setMode(m)}>{m === "myfoods" ? "My Foods" : m === "scan" ? "Scan" : m === "search" ? "Search" : "Custom"}</button>))}</div>
             {mode === "myfoods" && <div style={{ maxHeight: 320, overflowY: "auto" }}>{myFoods.length === 0 && <div style={styles.emptyHint}>No saved foods yet.</div>}{myFoods.map((f) => (<button key={f.id} style={styles.resultRow} onClick={() => selectFood(f)}><div style={{ flex: 1, textAlign: "left" }}><div style={styles.foodName}>{f.name}</div><div style={styles.foodMacros}>{Math.round(f.calories)} cal · P{Math.round(f.protein)} C{Math.round(f.carbs)} F{Math.round(f.fat)}</div></div></button>))}</div>}
             {mode === "scan" && <BarcodeScanner onFound={selectFood} usdaKey={usdaKey} setUsdaKey={setUsdaKey} keyInput={keyInput} setKeyInput={setKeyInput} />}
-            {mode === "search" && <div>{!usdaKey ? (<div><div style={styles.emptyHint}>Add your USDA API key to search.</div><div style={styles.fieldRow}><input placeholder="Paste USDA API key" value={keyInput} onChange={(e) => setKeyInput(e.target.value)} style={styles.input} /></div><button style={styles.primaryButton} onClick={() => setUsdaKey(keyInput)}>Save key</button></div>) : (<><div style={{ display: "flex", gap: 8, marginBottom: 10 }}><input placeholder="Search foods…" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runSearch()} style={{ ...styles.input, flex: 1 }} /><button style={styles.iconCircleButton} onClick={runSearch}><Search size={16} color={COLORS.bg} /></button></div>{searching && <div style={styles.emptyHint}>Searching…</div>}<div style={{ maxHeight: 280, overflowY: "auto" }}>{results.map((f, idx) => (<button key={idx} style={styles.resultRow} onClick={() => selectFood(f)}><div style={{ flex: 1, textAlign: "left" }}><div style={styles.foodName}>{f.name}</div><div style={styles.foodMacros}>{Math.round(f.calories)} cal ({f.servingNote}) · P{Math.round(f.protein)} C{Math.round(f.carbs)} F{Math.round(f.fat)}</div></div></button>))}</div></>)}</div>}
+            {mode === "search" && <div>{!usdaKey ? (<div><div style={styles.emptyHint}>Add your USDA API key to search.</div><div style={styles.fieldRow}><input placeholder="Paste USDA API key" value={keyInput} onChange={(e) => setKeyInput(e.target.value)} style={styles.input} /></div><button style={styles.primaryButton} onClick={() => setUsdaKey(keyInput)}>Save key</button></div>) : (<><div style={{ display: "flex", gap: 8, marginBottom: 10 }}><input placeholder="Search foods…" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runSearch()} style={{ ...styles.input, flex: 1 }} /><button style={styles.iconCircleButton} onClick={runSearch}><Search size={16} color={COLORS.bg} /></button></div>{searching && <div style={styles.emptyHint}>Searching…</div>}{!searching && searchError && <div style={{ ...styles.emptyHint, color: COLORS.amber }}>{searchError}</div>}<div style={{ maxHeight: 280, overflowY: "auto" }}>{results.map((f, idx) => (<button key={idx} style={styles.resultRow} onClick={() => selectFood(f)}><div style={{ flex: 1, textAlign: "left" }}><div style={styles.foodName}>{f.name}</div><div style={styles.foodMacros}>{Math.round(f.calories)} cal ({f.servingNote}) · P{Math.round(f.protein)} C{Math.round(f.carbs)} F{Math.round(f.fat)}</div></div></button>))}</div></>)}</div>}
             {mode === "custom" && <CustomFoodForm onSelect={selectFood} />}
           </>
         )}
@@ -1179,7 +1050,6 @@ function Dashboard({ profile, weights, workoutLogs, dayLog, plans, targets, tota
 
   return (
     <div style={styles.tabContent}>
-      <div style={styles.diagBox}>BUILD v11 · plans in library: {plans.length}</div>
       <div style={{ marginTop: 4 }}>
         <div style={styles.dimLabel}>{greeting},</div>
         <div style={styles.screenTitle}>{profile.name}</div>
@@ -1344,7 +1214,6 @@ const FONT_NUM = "'SF Mono', 'Roboto Mono', ui-monospace, monospace";
 const styles = {
   app: { minHeight: "100vh", background: COLORS.bg, color: COLORS.text, fontFamily: FONT_BODY, display: "flex", flexDirection: "column" },
   loadingScreen: { minHeight: "100vh", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center" },
-  offlineBanner: { background: "#2a1f0a", borderBottom: "1px solid #4a3a14", color: "#E8A33D", fontSize: 12, lineHeight: 1.4, padding: "10px 14px" },
   loadingText: { color: COLORS.textDim, fontFamily: FONT_BODY },
   content: { flex: 1, overflowY: "auto", paddingBottom: 76 },
   tabContent: { padding: "12px 14px 16px", display: "flex", flexDirection: "column", gap: 12, maxWidth: 480, margin: "0 auto" },
@@ -1388,7 +1257,7 @@ const styles = {
   foodMacros: { fontSize: 12, color: COLORS.textDim, marginTop: 2, fontFamily: FONT_NUM },
   emptyHint: { fontSize: 13, color: COLORS.textDim, padding: "8px 0", fontStyle: "italic" },
   helpNote: { fontSize: 12, color: COLORS.textDim, lineHeight: 1.5, padding: "4px 2px" },
-  diagBox: { fontFamily: FONT_NUM, fontSize: 11, color: COLORS.green, background: "#10231a", border: "1px solid #1d3a28", borderRadius: 8, padding: "8px 10px" },
+  warningBanner: { background: "#2a1f0a", border: "1px solid #4a3a14", color: "#E8A33D", fontSize: 12, lineHeight: 1.4, padding: "10px 12px", borderRadius: 8, marginBottom: 10 },
   fieldRow: { marginBottom: 10 },
   fieldLabel: { fontSize: 12, color: COLORS.textDim, display: "block", marginBottom: 4 },
   input: { width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 8, padding: "10px 12px", color: COLORS.text, fontSize: 15, fontFamily: FONT_BODY },
