@@ -1,0 +1,18 @@
+{
+  "name": "The Forge",
+  "short_name": "Forge",
+  "description": "A private, local-first fitness and nutrition tracker.",
+  "start_url": "/The-Forge/",
+  "scope": "/The-Forge/",
+  "display": "standalone",
+  "background_color": "#15171A",
+  "theme_color": "#15171A",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
