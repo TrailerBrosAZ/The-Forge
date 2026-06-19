@@ -1148,7 +1148,7 @@ function Dashboard({ profile, weights, workoutLogs, dayLog, plans, targets, tota
 // ============ BODY HEATMAP ============
 function heatColor(intensity) {
   // intensity 0..1 -> cool blue -> amber -> red
-  if (intensity <= 0) return "#262B31";
+  if (intensity <= 0) return "#3D444D";
   const stops = [
     { t: 0.0, c: [91, 155, 213] },   // blue
     { t: 0.5, c: [232, 163, 61] },   // amber
@@ -1169,6 +1169,7 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles }) {
   const max = Math.max(1, ...Object.values(heat));
   const norm = {}; Object.entries(heat).forEach(([z, v]) => norm[z] = v / max);
   const fill = (z) => heatColor(norm[z] || 0);
+  const intensity = (z) => norm[z] || 0;
   const ranked = Object.entries(heat).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   function setGender(g) { setProfiles((prev) => prev.map((p) => p.id === profile.id ? { ...p, gender: g } : p)); }
 
@@ -1192,7 +1193,7 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles }) {
       </div>
 
       <div style={styles.bodyCard}>
-        <AnatomyBody gender={gender} side={side} fill={fill} />
+        <AnatomyBody gender={gender} side={side} fill={fill} intensity={intensity} />
         <div style={styles.legendRow}>
           <span style={styles.dimLabel}>less</span>
           <div style={styles.legendBar} />
@@ -1217,15 +1218,38 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles }) {
 }
 
 // Anatomical body from embedded MIT-licensed muscle paths (react-native-body-highlighter).
-function AnatomyBody({ gender, side, fill }) {
+function AnatomyBody({ gender, side, fill, intensity }) {
   const key = `${gender}${side === "front" ? "Front" : "Back"}`;
   const paths = BODIES[key] || [];
   const vb = BODY_VB[key] || "0 0 724 1448";
+  const zones = [...new Set(paths.filter((p) => p.z !== "base").map((p) => p.z))];
   return (
     <svg viewBox={vb} style={styles.bodySvg} preserveAspectRatio="xMidYMid meet">
-      {paths.map((p, i) => (
-        <path key={i} d={p.d} fill={p.z === "base" ? "#2A2E33" : fill(p.z)} stroke="#15171A" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-      ))}
+      <defs>
+        {zones.map((z) => {
+          const iv = intensity ? intensity(z) : 0;
+          if (iv <= 0) return null;
+          const color = fill(z);
+          return (
+            <radialGradient key={z} id={`hg-${gender}-${side}-${z}`} cx="50%" cy="50%" r="65%" gradientUnits="objectBoundingBox">
+              <stop offset="0%" stopColor={color} stopOpacity="1" />
+              <stop offset="50%" stopColor={color} stopOpacity="0.65" />
+              <stop offset="100%" stopColor={color} stopOpacity="0" />
+            </radialGradient>
+          );
+        })}
+      </defs>
+      {paths.map((p, i) => {
+        if (p.z === "base") return (
+          <path key={i} d={p.d} fill="#2A2E33" stroke="#15171A" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+        );
+        const iv = intensity ? intensity(p.z) : 0;
+        return (
+          <path key={i} d={p.d}
+            fill={iv > 0 ? `url(#hg-${gender}-${side}-${p.z})` : "#3D444D"}
+            stroke="#15171A" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+        );
+      })}
     </svg>
   );
 }
