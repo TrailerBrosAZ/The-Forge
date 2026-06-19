@@ -864,6 +864,68 @@ function CustomFoodForm({ onSelect }) {
 }
 
 // ============ WEIGHT TAB ============
+function WeightChart({ sorted, goalWeight }) {
+  const W = 360, H = 190;
+  const ml = 40, mt = 18, mr = 14, mb = 34;
+  const cw = W - ml - mr, ch = H - mt - mb;
+
+  const allVals = sorted.map((w) => w.lbs);
+  if (goalWeight != null) allVals.push(Number(goalWeight));
+  const rawMin = Math.min(...allVals), rawMax = Math.max(...allVals);
+  const pad = Math.max((rawMax - rawMin) * 0.15, 3);
+  const yLo = rawMin - pad, yHi = rawMax + pad;
+  const yRange = yHi - yLo || 1;
+
+  const xOf = (i) => ml + (sorted.length > 1 ? (i / (sorted.length - 1)) * cw : cw / 2);
+  const yOf = (v) => mt + (1 - (v - yLo) / yRange) * ch;
+
+  const linePts = sorted.map((w, i) => `${xOf(i).toFixed(1)},${yOf(w.lbs).toFixed(1)}`).join(" ");
+  const areaPts = `${xOf(0).toFixed(1)},${(mt + ch).toFixed(1)} ${linePts} ${xOf(sorted.length - 1).toFixed(1)},${(mt + ch).toFixed(1)}`;
+
+  const yTicks = [0, 1, 2, 3].map((i) => yLo + (i / 3) * yRange);
+
+  const rawIdxs = sorted.length <= 5
+    ? sorted.map((_, i) => i)
+    : [0, Math.round((sorted.length - 1) / 3), Math.round(2 * (sorted.length - 1) / 3), sorted.length - 1];
+  const xLabelIdxs = [...new Set(rawIdxs)];
+
+  const gw = goalWeight != null ? Number(goalWeight) : null;
+  const gwY = gw != null ? yOf(gw) : null;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", marginTop: 8 }}>
+      <defs>
+        <linearGradient id="wAreaGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={COLORS.blue} stopOpacity="0.22" />
+          <stop offset="100%" stopColor={COLORS.blue} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {yTicks.map((v, i) => (
+        <line key={i} x1={ml} y1={yOf(v).toFixed(1)} x2={ml + cw} y2={yOf(v).toFixed(1)} stroke={COLORS.cardBorder} strokeWidth="1" />
+      ))}
+      {gw != null && (
+        <>
+          <line x1={ml} y1={gwY.toFixed(1)} x2={ml + cw} y2={gwY.toFixed(1)} stroke={COLORS.amber} strokeWidth="1.5" strokeDasharray="5 3" opacity="0.85" />
+          <text x={ml + cw} y={(gwY - 4).toFixed(1)} fill={COLORS.amber} fontSize="9.5" textAnchor="end" opacity="0.9">goal {gw}</text>
+        </>
+      )}
+      {sorted.length > 1 && <polygon points={areaPts} fill="url(#wAreaGrad)" />}
+      {sorted.length > 1 && (
+        <polyline points={linePts} fill="none" stroke={COLORS.blue} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+      )}
+      {sorted.map((w, i) => (
+        <circle key={i} cx={xOf(i).toFixed(1)} cy={yOf(w.lbs).toFixed(1)} r="3.5" fill={COLORS.blue} stroke={COLORS.bg} strokeWidth="2" />
+      ))}
+      {yTicks.map((v, i) => (
+        <text key={i} x={ml - 5} y={(yOf(v) + 4).toFixed(1)} fill={COLORS.textDim} fontSize="10" textAnchor="end">{Math.round(v)}</text>
+      ))}
+      {xLabelIdxs.map((i) => (
+        <text key={i} x={xOf(i).toFixed(1)} y={H - 6} fill={COLORS.textDim} fontSize="10" textAnchor="middle">{sorted[i].date.slice(5)}</text>
+      ))}
+    </svg>
+  );
+}
+
 function WeightTab({ weights, setWeights, profile, setProfiles }) {
   const [val, setVal] = useState("");
   const sorted = [...weights].sort((a, b) => a.date.localeCompare(b.date));
@@ -876,9 +938,6 @@ function WeightTab({ weights, setWeights, profile, setProfiles }) {
     if (profile.startWeight == null) setProfiles((prev) => prev.map((p) => p.id === profile.id ? { ...p, startWeight: lbs } : p));
     setVal("");
   }
-  const maxLbs = sorted.length ? Math.max(...sorted.map((w) => w.lbs)) : 0;
-  const minLbs = sorted.length ? Math.min(...sorted.map((w) => w.lbs)) : 0;
-  const range = Math.max(maxLbs - minLbs, 1);
   const [goalInput, setGoalInput] = useState(profile.goalWeight ?? "");
   function saveGoal() {
     const g = goalInput === "" ? null : Number(goalInput);
@@ -889,7 +948,7 @@ function WeightTab({ weights, setWeights, profile, setProfiles }) {
       <div style={styles.card}><div style={styles.cardHeader}>Log Weight</div><div style={{ display: "flex", gap: 8 }}><input type="number" step="0.1" placeholder="lbs" value={val} onChange={(e) => setVal(e.target.value)} style={{ ...styles.input, flex: 1 }} /><button style={styles.primaryButton} onClick={addWeight}>Log</button></div></div>
       {latest && <div style={styles.card}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><div><div style={styles.bigNumber}>{latest.lbs}<span style={{ fontSize: 16, color: COLORS.textDim }}> lbs</span></div><div style={styles.dimLabel}>as of {latest.date}</div></div>{delta !== null && <div style={{ ...styles.dimLabel, color: delta > 0 ? COLORS.red : COLORS.blue }}>{delta > 0 ? "+" : ""}{delta.toFixed(1)} lbs</div>}</div></div>}
       <div style={styles.card}><div style={styles.cardHeader}>Goal Weight</div><div style={{ display: "flex", gap: 8 }}><input type="number" step="0.1" placeholder="goal lbs" value={goalInput} onChange={(e) => setGoalInput(e.target.value)} style={{ ...styles.input, flex: 1 }} /><button style={styles.primaryButton} onClick={saveGoal}>Set</button></div>{profile.startWeight != null && profile.goalWeight != null && <div style={{ ...styles.dimLabel, marginTop: 8 }}>Start {profile.startWeight} → Goal {profile.goalWeight} lbs</div>}</div>
-      {sorted.length > 1 && <div style={styles.card}><div style={styles.cardHeader}>Trend</div><div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 100, marginTop: 8 }}>{sorted.slice(-30).map((w, idx) => { const h = 10 + ((w.lbs - minLbs) / range) * 80; return <div key={idx} title={`${w.date}: ${w.lbs}`} style={{ flex: 1, background: COLORS.amber, borderRadius: 2, height: `${h}%`, minWidth: 3 }} />; })}</div></div>}
+      {sorted.length > 0 && <div style={styles.card}><div style={styles.cardHeader}>Trend</div><WeightChart sorted={sorted} goalWeight={profile.goalWeight} /></div>}
       <div style={styles.card}><div style={styles.cardHeader}>History</div>{sorted.length === 0 && <div style={styles.emptyHint}>No weight logged yet</div>}{sorted.slice().reverse().map((w) => (<div key={w.date} style={styles.foodRow}><div style={{ flex: 1 }}>{w.date}</div><div style={styles.tabularNum}>{w.lbs} lbs</div></div>))}</div>
     </div>
   );
