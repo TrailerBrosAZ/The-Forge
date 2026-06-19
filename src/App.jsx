@@ -738,9 +738,10 @@ async function lookupBarcode(code, usdaKey) {
   if (!foods.length) return null;
   const norm = (s) => (s || "").replace(/^0+/, "");
   let match = foods.find((f) => norm(f.gtinUpc) === norm(code)) || foods[0];
+  const ln = match.labelNutrients || {};
   const nut = (names) => { for (const nm of names) { const n = match.foodNutrients?.find((x) => (x.nutrientName || x.name) === nm); if (n) return n.value != null ? n.value : n.amount; } return 0; };
   const name = [match.brandOwner || match.brandName, match.description].filter(Boolean).join(" ").replace(/\s+/g, " ").trim() || match.description;
-  return { name, calories: Math.round(nut(["Energy"]) || 0), protein: nut(["Protein"]) || 0, carbs: nut(["Carbohydrate, by difference"]) || 0, fat: nut(["Total lipid (fat)"]) || 0, servingNote: match.servingSize ? `${match.servingSize}${match.servingSizeUnit || ""}` : "per 100g", exactMatch: norm(match.gtinUpc) === norm(code) };
+  return { name, calories: Math.round(nut(["Energy"]) || ln.calories?.value || 0), protein: nut(["Protein"]) || ln.protein?.value || 0, carbs: nut(["Carbohydrate, by difference"]) || ln.carbohydrates?.value || 0, fat: nut(["Total lipid (fat)"]) || ln.fat?.value || 0, servingNote: match.servingSize ? `${match.servingSize}${match.servingSizeUnit || ""}` : "per 100g", exactMatch: norm(match.gtinUpc) === norm(code) };
 }
 
 function AddFoodModal({ sectionLabel, myFoods, usdaKey, setUsdaKey, onClose, onAdd }) {
@@ -759,7 +760,7 @@ function AddFoodModal({ sectionLabel, myFoods, usdaKey, setUsdaKey, onClose, onA
         return;
       }
       const data = await res.json();
-      const mapped = (data.foods || []).map((f) => { const nut = (n) => { const x = f.foodNutrients?.find((y) => y.nutrientName === n); return x ? x.value : 0; }; return { name: f.description, calories: nut("Energy"), protein: nut("Protein"), carbs: nut("Carbohydrate, by difference"), fat: nut("Total lipid (fat)"), servingNote: f.servingSize ? `${f.servingSize}${f.servingSizeUnit || ""}` : "100g (est)" }; });
+      const mapped = (data.foods || []).map((f) => { const ln = f.labelNutrients || {}; const nut = (n) => { const x = f.foodNutrients?.find((y) => y.nutrientName === n); return x ? x.value : 0; }; return { name: f.description, calories: nut("Energy") || ln.calories?.value || 0, protein: nut("Protein") || ln.protein?.value || 0, carbs: nut("Carbohydrate, by difference") || ln.carbohydrates?.value || 0, fat: nut("Total lipid (fat)") || ln.fat?.value || 0, servingNote: f.servingSize ? `${f.servingSize}${f.servingSizeUnit || ""}` : "100g (est)" }; });
       setResults(mapped);
       if (mapped.length === 0) setSearchError("No matches found for that search.");
     } catch (e) { console.error(e); setSearchError("Couldn't reach USDA — check your internet connection."); }
