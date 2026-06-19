@@ -1120,12 +1120,47 @@ function Dashboard({ profile, weights, workoutLogs, dayLog, plans, targets, tota
   const stats = computeStats({ profile, weights, workoutLogs, dayLog, plans, targets });
   const callouts = activeCallouts(stats);
   const hero = callouts[0];
-  const rest = callouts.slice(1, 6);
+  const highlights = callouts.slice(1, 6);
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  const remaining = Math.round(targets.calories - totals.calories);
   const activePlan = plans.find((p) => p.id === profile.activePlanId);
 
+  // Calorie progress
+  const calConsumed = Math.round(totals.calories);
+  const calTarget = targets.calories;
+  const calPct = Math.min(calConsumed / (calTarget || 1), 1);
+  const calRemaining = calTarget - calConsumed;
+  const isOver = calRemaining < 0;
+
+  // Macro donut
+  const pG = Math.round(totals.protein), cG = Math.round(totals.carbs), fG = Math.round(totals.fat);
+  const pKcal = pG * 4, cKcal = cG * 4, fKcal = fG * 9;
+  const totalMacroKcal = pKcal + cKcal + fKcal;
+  const polar = (cx, cy, r, deg) => { const rad = (deg - 90) * Math.PI / 180; return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)]; };
+  const donutArc = (cx, cy, R, ri, a1, a2) => {
+    if (a2 - a1 >= 360) a2 = a1 + 359.9;
+    const [x1, y1] = polar(cx, cy, R, a1), [x2, y2] = polar(cx, cy, R, a2);
+    const [x3, y3] = polar(cx, cy, ri, a2), [x4, y4] = polar(cx, cy, ri, a1);
+    const lg = a2 - a1 > 180 ? 1 : 0;
+    return `M${x1.toFixed(1)},${y1.toFixed(1)} A${R},${R} 0 ${lg} 1 ${x2.toFixed(1)},${y2.toFixed(1)} L${x3.toFixed(1)},${y3.toFixed(1)} A${ri},${ri} 0 ${lg} 0 ${x4.toFixed(1)},${y4.toFixed(1)} Z`;
+  };
+  const dcx = 60, dcy = 60, DR = 48, Dri = 32, Dgap = 3;
+  const donutSegments = [];
+  if (totalMacroKcal > 0) {
+    const pDeg = (pKcal / totalMacroKcal) * 360, cDeg = (cKcal / totalMacroKcal) * 360, fDeg = (fKcal / totalMacroKcal) * 360;
+    let a = 0;
+    if (pDeg > Dgap * 2) donutSegments.push({ d: donutArc(dcx, dcy, DR, Dri, a + Dgap / 2, a + pDeg - Dgap / 2), color: COLORS.blue });
+    a += pDeg;
+    if (cDeg > Dgap * 2) donutSegments.push({ d: donutArc(dcx, dcy, DR, Dri, a + Dgap / 2, a + cDeg - Dgap / 2), color: COLORS.amber });
+    a += cDeg;
+    if (fDeg > Dgap * 2) donutSegments.push({ d: donutArc(dcx, dcy, DR, Dri, a + Dgap / 2, a + fDeg - Dgap / 2), color: COLORS.pink });
+  }
+
+  // Workout progress — 5/wk default matches any structured training plan
+  const WORKOUT_TARGET = 5;
+  const workoutsThisWeek = stats.workoutsThisWeek;
+
+  // Weight trend
   const sortedW = [...(weights || [])].sort((a, b) => a.date.localeCompare(b.date));
   const recentW = sortedW.slice(-14);
   const wMin = recentW.length ? Math.min(...recentW.map(w => w.lbs)) : 0;
@@ -1146,22 +1181,77 @@ function Dashboard({ profile, weights, workoutLogs, dayLog, plans, targets, tota
         </div>
       )}
 
-      <div style={styles.dashGrid}>
+      {/* Calories progress */}
+      <div style={styles.card}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+          <div style={styles.cardHeader}>Calories</div>
+          <div style={{ fontSize: 13, color: isOver ? COLORS.red : COLORS.textDim }}>
+            {isOver ? `+${Math.abs(Math.round(calRemaining))} over` : `${Math.round(calRemaining)} left`}
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 10 }}>
+          <span style={{ fontFamily: FONT_NUM, fontSize: 32, fontWeight: 700, color: COLORS.text, lineHeight: 1 }}>{calConsumed.toLocaleString()}</span>
+          <span style={{ color: COLORS.textDim, fontSize: 14 }}>of {calTarget.toLocaleString()} cal</span>
+        </div>
+        <div style={{ height: 8, borderRadius: 4, background: COLORS.cardBorder, overflow: "hidden" }}>
+          <div style={{ height: "100%", width: `${Math.round(calPct * 100)}%`, background: isOver ? COLORS.red : COLORS.amber, borderRadius: 4 }} />
+        </div>
+      </div>
+
+      {/* Macro donut + per-macro progress bars */}
+      <div style={styles.card}>
+        <div style={styles.cardHeader}>Macros</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 6 }}>
+          <svg viewBox="0 0 120 120" style={{ flex: "0 0 110px", width: 110, height: 110 }}>
+            <circle cx={dcx} cy={dcy} r={(DR + Dri) / 2} fill="none" stroke={COLORS.cardBorder} strokeWidth={DR - Dri} />
+            {donutSegments.map((seg, i) => <path key={i} d={seg.d} fill={seg.color} />)}
+            <text x={dcx} y={dcy - 5} textAnchor="middle" fill={COLORS.text} fontSize="14" fontWeight="700" fontFamily={FONT_NUM}>
+              {totalMacroKcal > 0 ? Math.round(totalMacroKcal) : "—"}
+            </text>
+            <text x={dcx} y={dcy + 10} textAnchor="middle" fill={COLORS.textDim} fontSize="10">
+              {totalMacroKcal > 0 ? "kcal" : "no food"}
+            </text>
+          </svg>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 9 }}>
+            {[
+              { label: "Protein", g: pG, target: targets.protein, color: COLORS.blue },
+              { label: "Carbs", g: cG, target: targets.carbs, color: COLORS.amber },
+              { label: "Fat", g: fG, target: targets.fat, color: COLORS.pink },
+            ].map(({ label, g, target, color }) => (
+              <div key={label}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                  <span style={{ color: COLORS.textDim }}>{label}</span>
+                  <span style={{ fontFamily: FONT_NUM, color: COLORS.text }}>{g}<span style={{ color: COLORS.textDim }}>/{target}g</span></span>
+                </div>
+                <div style={{ height: 5, borderRadius: 3, background: COLORS.cardBorder, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${Math.min(g / (target || 1), 1) * 100}%`, background: color, borderRadius: 3 }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Workouts this week + Streak */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <div style={styles.statTile}>
-          <div style={styles.statBig}>{remaining >= 0 ? remaining : `+${Math.abs(remaining)}`}</div>
-          <div style={styles.statLabel}>{remaining >= 0 ? "cal left" : "cal over"}</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 2 }}>
+            <span style={{ fontFamily: FONT_NUM, fontSize: 26, fontWeight: 600, lineHeight: 1 }}>{workoutsThisWeek}</span>
+            <span style={{ fontSize: 12, color: COLORS.textDim }}>of {WORKOUT_TARGET}</span>
+          </div>
+          <div style={{ fontSize: 12, color: COLORS.textDim, marginBottom: 10 }}>workouts this wk</div>
+          <div style={{ display: "flex", gap: 4 }}>
+            {Array.from({ length: WORKOUT_TARGET }, (_, i) => (
+              <div key={i} style={{ flex: 1, height: 5, borderRadius: 3, background: i < workoutsThisWeek ? COLORS.green : COLORS.cardBorder }} />
+            ))}
+          </div>
         </div>
         <div style={styles.statTile}>
-          <div style={styles.statBig}>{stats.workoutsThisWeek}</div>
-          <div style={styles.statLabel}>workouts this wk</div>
-        </div>
-        <div style={styles.statTile}>
-          <div style={styles.statBig}>{stats.loggingStreak}</div>
-          <div style={styles.statLabel}>day streak</div>
-        </div>
-        <div style={styles.statTile}>
-          <div style={styles.statBig}>{Math.round(stats.protein || totals.protein)}<span style={{ fontSize: 13, color: COLORS.textDim }}>g</span></div>
-          <div style={styles.statLabel}>protein today</div>
+          <div style={{ fontFamily: FONT_NUM, fontSize: 26, fontWeight: 600, lineHeight: 1, marginBottom: 2 }}>{stats.loggingStreak}</div>
+          <div style={{ fontSize: 12, color: COLORS.textDim, marginBottom: 10 }}>day streak</div>
+          <div style={{ fontSize: 11, color: stats.loggingStreak >= 3 ? COLORS.green : COLORS.textDim }}>
+            {stats.loggingStreak >= 14 ? "outstanding" : stats.loggingStreak >= 7 ? "on a roll" : stats.loggingStreak >= 3 ? "building" : stats.loggingStreak > 0 ? "keep going" : "start today"}
+          </div>
         </div>
       </div>
 
@@ -1189,10 +1279,10 @@ function Dashboard({ profile, weights, workoutLogs, dayLog, plans, targets, tota
         </div>
       )}
 
-      {rest.length > 0 && (
+      {highlights.length > 0 && (
         <div style={styles.card}>
           <div style={styles.cardHeader}>Highlights</div>
-          {rest.map((c) => (
+          {highlights.map((c) => (
             <div key={c.id} style={styles.calloutRow}>
               <div style={styles.calloutDot} />
               <span style={styles.calloutText}>{c.text}</span>
