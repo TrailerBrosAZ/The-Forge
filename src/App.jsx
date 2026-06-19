@@ -798,7 +798,7 @@ function AddFoodModal({ sectionLabel, myFoods, usdaKey, setUsdaKey, onClose, onA
 function BarcodeScanner({ onFound, usdaKey, setUsdaKey, keyInput, setKeyInput }) {
   const [supported] = useState(typeof window !== "undefined" && "BarcodeDetector" in window);
   const [status, setStatus] = useState(""); const [manual, setManual] = useState(""); const [looking, setLooking] = useState(false);
-  const digits = manual.replace(/\D/g, ""); const isValidLength = [8, 12, 13].includes(digits.length);
+  const digits = manual.replace(/\D/g, ""); const isValidLength = [8, 12, 13, 14].includes(digits.length);
   async function handleCode(code) {
     setLooking(true); setStatus(`Looking up ${code}…`);
     try {
@@ -819,9 +819,9 @@ function BarcodeScanner({ onFound, usdaKey, setUsdaKey, keyInput, setKeyInput })
         <input style={{ ...styles.input, flex: 1 }} inputMode="numeric" placeholder="Barcode number" value={manual} onChange={(e) => setManual(e.target.value.replace(/[^\d]/g, ""))} onKeyDown={(e) => e.key === "Enter" && isValidLength && handleCode(digits)} />
         <button style={{ ...styles.iconCircleButton, opacity: isValidLength && !looking ? 1 : 0.4 }} disabled={!isValidLength || looking} onClick={() => handleCode(digits)}><ScanBarcode size={16} color={COLORS.bg} /></button>
       </div>
-      {digits.length === 0 ? <div style={{ ...styles.dimLabel, marginTop: 8 }}>Enter the full number under the barcode (12 or 13 digits)</div>
+      {digits.length === 0 ? <div style={{ ...styles.dimLabel, marginTop: 8 }}>Enter the full number under the barcode (12, 13, or 14 digits)</div>
         : isValidLength ? <div style={{ ...styles.validHint, color: COLORS.green }}><Check size={14} /> {digits.length} digits — looks valid</div>
-        : <div style={{ ...styles.validHint, color: COLORS.amber }}>{digits.length} digit{digits.length === 1 ? "" : "s"} — need 12 or 13 (check far left/right of the bars)</div>}
+        : <div style={{ ...styles.validHint, color: COLORS.amber }}>{digits.length} digit{digits.length === 1 ? "" : "s"} — need 12, 13, or 14 (check far left/right of the bars)</div>}
       {status && <div style={{ ...styles.dimLabel, marginTop: 10 }}>{status}</div>}
     </div>
   );
