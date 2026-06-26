@@ -1751,6 +1751,9 @@ function formatMeasurementValue(m) {
 function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightEntry, saveGoalWeight, measurements, addMeasurementEntry, onGoTrain }) {
   const [side, setSide] = useState("front");
   const [windowDays, setWindowDays] = useState(7);
+  const [muscleWindowDays, setMuscleWindowDays] = useState(7);
+  const [setsOpen, setSetsOpen] = useState(false);
+  const [measurementsOpen, setMeasurementsOpen] = useState(false);
   const [weightVal, setWeightVal] = useState("");
   const [goalInput, setGoalInput] = useState(profile.goalWeight ?? "");
   const [measurePart, setMeasurePart] = useState("Waist");
@@ -1759,11 +1762,13 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
   const [quickEdit, setQuickEdit] = useState(null);
   const gender = profile.gender || "male";
   const heat = computeHeatmap(workoutLogs, plans, windowDays);
+  const muscleHeat = computeHeatmap(workoutLogs, plans, muscleWindowDays);
   const max = Math.max(1, ...Object.values(heat));
   const norm = {}; Object.entries(heat).forEach(([z, v]) => norm[z] = v / max);
   const fill = (z) => heatColor(norm[z] || 0);
   const intensity = (z) => norm[z] || 0;
-  const ranked = Object.entries(heat).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const muscleMax = Math.max(1, ...Object.values(muscleHeat));
+  const ranked = Object.entries(muscleHeat).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   function setGender(g) { setProfiles((prev) => prev.map((p) => p.id === profile.id ? { ...p, gender: g } : p)); }
   const sortedWeights = [...(weights || [])].sort((a, b) => a.date.localeCompare(b.date));
   const latestWeight = sortedWeights[sortedWeights.length - 1], priorWeight = sortedWeights[sortedWeights.length - 2];
@@ -1862,19 +1867,6 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
       </div>
 
       <div style={styles.card}>
-        <div style={styles.cardHeader}>Sets by muscle · {windowDays === 3650 ? "all time" : `last ${windowDays} days`}</div>
-        {ranked.length === 0 && <button style={styles.linkButton} onClick={onGoTrain}>Log a workout to build your heatmap</button>}
-        {ranked.map(([z, v]) => (
-          <div key={z} style={styles.zoneStatRow}>
-            <div style={{ width: 10, height: 10, borderRadius: 2, background: heatColor((v / max)) }} />
-            <span style={{ flex: 1, textTransform: "capitalize", fontSize: 14 }}>{z}</span>
-            <span style={styles.tabularNum}>{Math.round(v)}</span>
-          </div>
-        ))}
-      </div>
-      <div style={styles.helpNote}>Intensity is working-set volume per muscle in the window. Blue is light, red is heavily worked. Untouched muscles stay dark.</div>
-
-      <div style={styles.card}>
         <div style={styles.cardHeader}>Weight Trend</div>
         {sortedWeights.length > 0 ? <WeightChart sorted={sortedWeights} goalWeight={profile.goalWeight} /> : <div style={styles.emptyHint}>Log weight to start your trend.</div>}
         <div style={styles.weightSummaryGrid}>
@@ -1900,10 +1892,40 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
         </div>
       </div>
 
+      <div style={styles.card}>
+        <button type="button" style={styles.collapsibleHeader} onClick={() => setSetsOpen((v) => !v)}>
+          <span>Sets by muscle</span>
+          <span style={styles.collapsibleMeta}>{muscleWindowDays === 1 ? "today" : `last ${muscleWindowDays} days`}</span>
+          {setsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        </button>
+        {setsOpen && (
+          <>
+            <div style={styles.detailFilterRow}>
+              {[[1, "Today"], [7, "7 days"], [30, "30 days"]].map(([v, label]) => (
+                <button key={v} type="button" style={{ ...styles.detailFilterBtn, ...(muscleWindowDays === v ? styles.detailFilterBtnOn : {}) }} onClick={() => setMuscleWindowDays(v)}>{label}</button>
+              ))}
+            </div>
+            {ranked.length === 0 && <button style={styles.linkButton} onClick={onGoTrain}>Log a workout to build your heatmap</button>}
+            {ranked.map(([z, v]) => (
+              <div key={z} style={styles.zoneStatRow}>
+                <div style={{ width: 10, height: 10, borderRadius: 2, background: heatColor((v / muscleMax)) }} />
+                <span style={{ flex: 1, textTransform: "capitalize", fontSize: 14 }}>{z}</span>
+                <span style={styles.tabularNum}>{Math.round(v)}</span>
+              </div>
+            ))}
+            <div style={{ ...styles.helpNote, marginTop: 6 }}>Working-set volume by muscle for the selected window.</div>
+          </>
+        )}
+      </div>
+
       {latestMetrics.length > 0 && (
         <div style={styles.card}>
-          <div style={styles.cardHeader}>Latest Measurements</div>
-          {latestMetrics.map((m) => (
+          <button type="button" style={styles.collapsibleHeader} onClick={() => setMeasurementsOpen((v) => !v)}>
+            <span>Latest Measurements</span>
+            <span style={styles.collapsibleMeta}>{latestMetrics.length}</span>
+            {measurementsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          </button>
+          {measurementsOpen && latestMetrics.map((m) => (
             <div key={`${m.part}-${m.kind}`} style={styles.measureRow}>
               <span>{m.part}</span>
               <span style={styles.tabularNum}>{formatMeasurementValue(m.latest)}</span>
@@ -2162,6 +2184,11 @@ const styles = {
   quickMeasureForm: { display: "grid", gridTemplateColumns: "1fr 82px", gap: 8, marginTop: 8 },
   inlineMeasurePanel: { width: "100%", background: "rgba(13, 15, 18, 0.48)", border: `1px solid ${COLORS.cardBorder}`, borderRadius: 10, padding: 10, marginTop: 10 },
   inlineMeasureTitle: { fontSize: 11, color: COLORS.textDim, textTransform: "uppercase", letterSpacing: 0, marginBottom: 8, fontWeight: 700 },
+  collapsibleHeader: { width: "100%", display: "grid", gridTemplateColumns: "1fr auto auto", gap: 8, alignItems: "center", background: "transparent", border: "none", color: COLORS.text, padding: 0, cursor: "pointer", fontFamily: FONT_BODY, fontSize: 15, fontWeight: 700, textAlign: "left" },
+  collapsibleMeta: { color: COLORS.textDim, fontSize: 12, fontWeight: 600 },
+  detailFilterRow: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginTop: 10 },
+  detailFilterBtn: { height: 32, borderRadius: 8, border: `1px solid ${COLORS.cardBorder}`, background: COLORS.bg, color: COLORS.textDim, fontFamily: FONT_BODY, fontSize: 12, cursor: "pointer" },
+  detailFilterBtnOn: { background: COLORS.amber, borderColor: COLORS.amber, color: COLORS.bg, fontWeight: 700 },
   zoneStatRow: { display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: `1px solid ${COLORS.cardBorder}` },
   weightSummaryGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 },
   weightSummaryTile: { background: COLORS.bg, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 10, padding: 10 },
