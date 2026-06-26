@@ -1756,7 +1756,7 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
   const [measurePart, setMeasurePart] = useState("Waist");
   const [measureKind, setMeasureKind] = useState("circumference");
   const [measureVal, setMeasureVal] = useState("");
-  const measurementFormRef = useRef(null);
+  const [quickEdit, setQuickEdit] = useState(null);
   const gender = profile.gender || "male";
   const heat = computeHeatmap(workoutLogs, plans, windowDays);
   const max = Math.max(1, ...Object.values(heat));
@@ -1775,9 +1775,26 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
     return { part, kind, latest, prev, delta: latest && prev ? latest.value - prev.value : null };
   })).filter((m) => m.latest);
   const measureUnit = MEASUREMENT_KINDS[measureKind].unit;
-  function chooseMeasurementPart(part) {
+  function logMeasurement(part, kind, rawValue) {
+    if (rawValue === "" || rawValue == null) return;
+    const unit = MEASUREMENT_KINDS[kind].unit;
+    addMeasurementEntry({ date: todayKey(), part, kind, unit, value: Number(rawValue) });
+  }
+  function startMeasurementEdit(part) {
+    const partMetrics = latestMetrics.filter((m) => m.part === part);
+    const primary = partMetrics.find((m) => m.kind === "mass") || partMetrics[0];
     setMeasurePart(part);
-    measurementFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setMeasureKind(primary?.kind || "circumference");
+    setQuickEdit({
+      part,
+      kind: primary?.kind || "circumference",
+      value: primary?.latest?.value != null ? String(primary.latest.value) : "",
+    });
+  }
+  function changeQuickKind(kind) {
+    if (!quickEdit) return;
+    const existing = latestMetrics.find((m) => m.part === quickEdit.part && m.kind === kind);
+    setQuickEdit({ ...quickEdit, kind, value: existing?.latest?.value != null ? String(existing.latest.value) : "" });
   }
 
   return (
@@ -1786,30 +1803,61 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
 
       <div style={styles.bodyCard}>
         <div style={styles.bodyVisualWrap}>
+          <div style={styles.heatmapTopControls}>
+            <button type="button" style={styles.compactToggle} onClick={() => setSide(side === "front" ? "back" : "front")}>
+              <span style={side === "front" ? styles.compactToggleOn : styles.compactToggleOff}>Front</span>
+              <span style={side === "back" ? styles.compactToggleOn : styles.compactToggleOff}>Back</span>
+            </button>
+            <select value={windowDays} onChange={(e) => setWindowDays(Number(e.target.value))} style={styles.compactSelect} aria-label="Heatmap range">
+              <option value={7}>7 days</option>
+              <option value={30}>30 days</option>
+              <option value={3650}>All time</option>
+            </select>
+            <button type="button" style={styles.genderToggle} onClick={() => setGender(gender === "male" ? "female" : "male")} aria-label="Switch body model">
+              <span style={gender === "male" ? styles.compactToggleOn : styles.compactToggleOff}>M</span>
+              <span style={gender === "female" ? styles.compactToggleOn : styles.compactToggleOff}>F</span>
+            </button>
+          </div>
           <AnatomyBody gender={gender} side={side} fill={fill} intensity={intensity} />
-          <MeasurementCallouts metrics={latestMetrics} onSelectPart={chooseMeasurementPart} />
+          <MeasurementCallouts metrics={latestMetrics} onSelectPart={startMeasurementEdit} />
         </div>
         <div style={styles.legendRow}>
           <span style={styles.dimLabel}>less</span>
           <div style={styles.legendBar} />
           <span style={styles.dimLabel}>more</span>
         </div>
-        <div style={styles.heatmapControls}>
-          <div style={styles.segRow}>
-            {[["front", "Front"], ["back", "Back"]].map(([v, l]) => (
-              <button key={v} style={{ ...styles.segBtn, ...(side === v ? styles.segBtnOn : {}) }} onClick={() => setSide(v)}>{l}</button>
-            ))}
+        {quickEdit && (
+          <div style={styles.quickMeasurePanel}>
+            <div style={styles.quickMeasureHeader}>
+              <div>
+                <div style={styles.cardHeader}>{quickEdit.part}</div>
+                <div style={styles.dimLabel}>Quick measurement update</div>
+              </div>
+              <button type="button" style={styles.iconButtonSmall} onClick={() => setQuickEdit(null)} aria-label="Close quick measurement"><X size={16} /></button>
+            </div>
+            <div style={styles.quickKindRow}>
+              {Object.entries(MEASUREMENT_KINDS).map(([key, meta]) => (
+                <button key={key} type="button" style={{ ...styles.quickKindBtn, ...(quickEdit.kind === key ? styles.quickKindBtnOn : {}) }} onClick={() => changeQuickKind(key)}>{meta.label}</button>
+              ))}
+            </div>
+            <div style={styles.quickMeasureForm}>
+              <input type="number" step="0.1" value={quickEdit.value} onChange={(e) => setQuickEdit({ ...quickEdit, value: e.target.value })} placeholder={MEASUREMENT_KINDS[quickEdit.kind].unit} style={styles.input} />
+              <button type="button" style={styles.primaryButton} onClick={() => { logMeasurement(quickEdit.part, quickEdit.kind, quickEdit.value); setQuickEdit(null); }}>Done</button>
+            </div>
           </div>
-          <div style={styles.segRow}>
-            {[[7, "7 days"], [30, "30 days"], [3650, "All time"]].map(([v, l]) => (
-              <button key={v} style={{ ...styles.segBtn, ...(windowDays === v ? styles.segBtnOn : {}) }} onClick={() => setWindowDays(v)}>{l}</button>
-            ))}
+        )}
+        <div style={styles.inlineMeasurePanel}>
+          <div style={styles.inlineMeasureTitle}>Add Measurement</div>
+          <div style={styles.measureInputGrid}>
+            <select value={measurePart} onChange={(e) => setMeasurePart(e.target.value)} style={{ ...styles.input, gridColumn: "1 / -1" }}>
+              {BODY_MEASUREMENTS.map((part) => <option key={part} value={part}>{part}</option>)}
+            </select>
+            <select value={measureKind} onChange={(e) => setMeasureKind(e.target.value)} style={styles.input}>
+              {Object.entries(MEASUREMENT_KINDS).map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}
+            </select>
+            <input type="number" step="0.1" placeholder={measureUnit} value={measureVal} onChange={(e) => setMeasureVal(e.target.value)} style={styles.input} />
           </div>
-          <div style={styles.segRow}>
-            {[["male", "Male"], ["female", "Female"]].map(([v, l]) => (
-              <button key={v} style={{ ...styles.segBtn, ...(gender === v ? styles.segBtnOn : {}) }} onClick={() => setGender(v)}>{l}</button>
-            ))}
-          </div>
+          <button style={{ ...styles.primaryButton, width: "100%", marginTop: 8 }} onClick={() => { logMeasurement(measurePart, measureKind, measureVal); setMeasureVal(""); }}>Log Measurement</button>
         </div>
       </div>
 
@@ -1850,21 +1898,6 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
           <input type="number" step="0.1" placeholder="goal lbs" value={goalInput} onChange={(e) => setGoalInput(e.target.value)} style={styles.input} />
           <button style={styles.primaryButton} onClick={() => saveGoalWeight(goalInput === "" ? null : Number(goalInput))}>Set</button>
         </div>
-      </div>
-
-      <div ref={measurementFormRef} style={styles.card}>
-        <div style={styles.cardHeader}>Measurements</div>
-        <div style={styles.measureInputGrid}>
-          <select value={measurePart} onChange={(e) => setMeasurePart(e.target.value)} style={{ ...styles.input, gridColumn: "1 / -1" }}>
-            {BODY_MEASUREMENTS.map((part) => <option key={part} value={part}>{part}</option>)}
-          </select>
-          <select value={measureKind} onChange={(e) => setMeasureKind(e.target.value)} style={styles.input}>
-            {Object.entries(MEASUREMENT_KINDS).map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}
-          </select>
-          <input type="number" step="0.1" placeholder={measureUnit} value={measureVal} onChange={(e) => setMeasureVal(e.target.value)} style={styles.input} />
-        </div>
-        <button style={{ ...styles.primaryButton, width: "100%", marginTop: 10 }} onClick={() => { if (!measureVal) return; addMeasurementEntry({ date: todayKey(), part: measurePart, kind: measureKind, unit: measureUnit, value: Number(measureVal) }); setMeasureVal(""); }}>Log Measurement</button>
-        <div style={styles.emptyHint}>{latestMetrics.length === 0 ? "No measurements logged yet." : "Tap a body label above to preselect that measurement."}</div>
       </div>
 
       {latestMetrics.length > 0 && (
@@ -2103,8 +2136,14 @@ const styles = {
   segBtn: { flex: 1, background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 8, padding: "8px 0", fontSize: 13, color: COLORS.textDim, cursor: "pointer", fontFamily: FONT_BODY },
   segBtnOn: { color: COLORS.bg, background: COLORS.amber, borderColor: COLORS.amber, fontWeight: 600 },
   bodyCard: { background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 14, padding: 14, display: "flex", flexDirection: "column", alignItems: "center" },
-  bodyVisualWrap: { position: "relative", width: "100%", maxWidth: 400, display: "flex", justifyContent: "center" },
+  bodyVisualWrap: { position: "relative", width: "100%", maxWidth: 400, display: "flex", justifyContent: "center", paddingTop: 38 },
   bodySvg: { width: "100%", maxWidth: 260, height: "auto", maxHeight: 440 },
+  heatmapTopControls: { position: "absolute", top: 0, left: 0, right: 0, display: "grid", gridTemplateColumns: "1fr 88px 54px", gap: 6, alignItems: "center", zIndex: 3 },
+  compactToggle: { height: 30, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, alignItems: "center", background: "rgba(13, 15, 18, 0.82)", border: `1px solid ${COLORS.cardBorder}`, borderRadius: 8, padding: 2, color: COLORS.text, fontFamily: FONT_BODY, cursor: "pointer" },
+  genderToggle: { height: 30, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, alignItems: "center", background: "rgba(13, 15, 18, 0.82)", border: `1px solid ${COLORS.cardBorder}`, borderRadius: 8, padding: 2, color: COLORS.text, fontFamily: FONT_BODY, cursor: "pointer" },
+  compactToggleOn: { height: 24, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 6, background: COLORS.amber, color: COLORS.bg, fontSize: 11, fontWeight: 700 },
+  compactToggleOff: { height: 24, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 6, color: COLORS.textDim, fontSize: 11, fontWeight: 600 },
+  compactSelect: { height: 30, width: "100%", background: "rgba(13, 15, 18, 0.82)", border: `1px solid ${COLORS.cardBorder}`, borderRadius: 8, color: COLORS.text, fontSize: 11, fontFamily: FONT_BODY, padding: "0 6px" },
   measureCalloutLayer: { position: "absolute", inset: 0, pointerEvents: "none" },
   measureAnchorDot: { position: "absolute", width: 7, height: 7, marginLeft: -3.5, marginTop: -3.5, borderRadius: "50%", background: COLORS.amber, boxShadow: `0 0 0 3px ${COLORS.amberSoft}` },
   measureConnector: { position: "absolute", height: 0, borderTop: `1px dotted ${COLORS.amber}`, opacity: 0.8, transformOrigin: "0 50%" },
@@ -2114,6 +2153,15 @@ const styles = {
   legendRow: { display: "flex", alignItems: "center", gap: 8, marginTop: 8 },
   legendBar: { width: 120, height: 8, borderRadius: 4, background: "linear-gradient(90deg, #5B9BD5, #E8A33D, #E5604F)" },
   heatmapControls: { width: "100%", display: "grid", gap: 7, marginTop: 10 },
+  quickMeasurePanel: { width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 10, padding: 10, marginTop: 10 },
+  quickMeasureHeader: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 },
+  iconButtonSmall: { width: 30, height: 30, borderRadius: 8, border: `1px solid ${COLORS.cardBorder}`, background: COLORS.card, color: COLORS.textDim, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
+  quickKindRow: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 8 },
+  quickKindBtn: { height: 32, borderRadius: 8, border: `1px solid ${COLORS.cardBorder}`, background: COLORS.card, color: COLORS.textDim, fontFamily: FONT_BODY, fontSize: 12, cursor: "pointer" },
+  quickKindBtnOn: { background: COLORS.amber, borderColor: COLORS.amber, color: COLORS.bg, fontWeight: 700 },
+  quickMeasureForm: { display: "grid", gridTemplateColumns: "1fr 82px", gap: 8, marginTop: 8 },
+  inlineMeasurePanel: { width: "100%", background: "rgba(13, 15, 18, 0.48)", border: `1px solid ${COLORS.cardBorder}`, borderRadius: 10, padding: 10, marginTop: 10 },
+  inlineMeasureTitle: { fontSize: 11, color: COLORS.textDim, textTransform: "uppercase", letterSpacing: 0, marginBottom: 8, fontWeight: 700 },
   zoneStatRow: { display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: `1px solid ${COLORS.cardBorder}` },
   weightSummaryGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 },
   weightSummaryTile: { background: COLORS.bg, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 10, padding: 10 },
