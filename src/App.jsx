@@ -1827,27 +1827,30 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
       <div style={styles.helpNote}>Intensity is working-set volume per muscle in the window. Blue is light, red is heavily worked. Untouched muscles stay dark.</div>
 
       <div style={styles.card}>
-        <div style={styles.cardHeader}>Weight</div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input type="number" step="0.1" placeholder="lbs" value={weightVal} onChange={(e) => setWeightVal(e.target.value)} style={{ ...styles.input, flex: 1 }} />
-          <button style={styles.primaryButton} onClick={() => { if (!weightVal) return; addWeightEntry(Number(weightVal)); setWeightVal(""); }}>Log</button>
-        </div>
-        {latestWeight && (
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 12 }}>
-            <div><div style={styles.bigNumber}>{latestWeight.lbs}<span style={{ fontSize: 16, color: COLORS.textDim }}> lbs</span></div><div style={styles.dimLabel}>as of {latestWeight.date}</div></div>
-            {weightDelta !== null && <div style={{ ...styles.dimLabel, color: weightDelta > 0 ? COLORS.red : COLORS.blue }}>{weightDelta > 0 ? "+" : ""}{weightDelta.toFixed(1)} lbs</div>}
+        <div style={styles.cardHeader}>Weight Trend</div>
+        {sortedWeights.length > 0 ? <WeightChart sorted={sortedWeights} goalWeight={profile.goalWeight} /> : <div style={styles.emptyHint}>Log weight to start your trend.</div>}
+        <div style={styles.weightSummaryGrid}>
+          <div style={styles.weightSummaryTile}>
+            <div style={styles.weightSummaryLabel}>Current</div>
+            <div style={styles.weightSummaryValue}>{latestWeight ? latestWeight.lbs : "--"}<span style={styles.weightSummaryUnit}> lbs</span></div>
+            <div style={styles.dimLabel}>{latestWeight ? `as of ${latestWeight.date}` : "no entry yet"}</div>
           </div>
-        )}
-      </div>
-      <div style={styles.card}>
-        <div style={styles.cardHeader}>Goal Weight</div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input type="number" step="0.1" placeholder="goal lbs" value={goalInput} onChange={(e) => setGoalInput(e.target.value)} style={{ ...styles.input, flex: 1 }} />
+          <div style={styles.weightSummaryTile}>
+            <div style={styles.weightSummaryLabel}>Goal</div>
+            <div style={styles.weightSummaryValue}>{profile.goalWeight ?? "--"}<span style={styles.weightSummaryUnit}> lbs</span></div>
+            <div style={styles.dimLabel}>
+              {latestWeight && profile.goalWeight != null ? `${Math.abs(latestWeight.lbs - profile.goalWeight).toFixed(1)} lbs to goal` : profile.startWeight != null && profile.goalWeight != null ? `start ${profile.startWeight} lbs` : "set a target"}
+            </div>
+          </div>
+        </div>
+        {weightDelta !== null && <div style={{ ...styles.dimLabel, marginTop: 8, color: weightDelta > 0 ? COLORS.red : COLORS.blue }}>{weightDelta > 0 ? "+" : ""}{weightDelta.toFixed(1)} lbs since previous log</div>}
+        <div style={styles.weightControlGrid}>
+          <input type="number" step="0.1" placeholder="log lbs" value={weightVal} onChange={(e) => setWeightVal(e.target.value)} style={styles.input} />
+          <button style={styles.primaryButton} onClick={() => { if (!weightVal) return; addWeightEntry(Number(weightVal)); setWeightVal(""); }}>Log</button>
+          <input type="number" step="0.1" placeholder="goal lbs" value={goalInput} onChange={(e) => setGoalInput(e.target.value)} style={styles.input} />
           <button style={styles.primaryButton} onClick={() => saveGoalWeight(goalInput === "" ? null : Number(goalInput))}>Set</button>
         </div>
-        {profile.startWeight != null && profile.goalWeight != null && <div style={{ ...styles.dimLabel, marginTop: 8 }}>Start {profile.startWeight} to Goal {profile.goalWeight} lbs</div>}
       </div>
-      {sortedWeights.length > 0 && <div style={styles.card}><div style={styles.cardHeader}>Weight Trend</div><WeightChart sorted={sortedWeights} goalWeight={profile.goalWeight} /></div>}
 
       <div ref={measurementFormRef} style={styles.card}>
         <div style={styles.cardHeader}>Measurements</div>
@@ -2112,6 +2115,12 @@ const styles = {
   legendBar: { width: 120, height: 8, borderRadius: 4, background: "linear-gradient(90deg, #5B9BD5, #E8A33D, #E5604F)" },
   heatmapControls: { width: "100%", display: "grid", gap: 7, marginTop: 10 },
   zoneStatRow: { display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: `1px solid ${COLORS.cardBorder}` },
+  weightSummaryGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 },
+  weightSummaryTile: { background: COLORS.bg, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 10, padding: 10 },
+  weightSummaryLabel: { fontSize: 11, color: COLORS.textDim, textTransform: "uppercase", letterSpacing: 0, marginBottom: 4 },
+  weightSummaryValue: { fontFamily: FONT_NUM, fontSize: 24, fontWeight: 700, lineHeight: 1.05 },
+  weightSummaryUnit: { fontSize: 12, color: COLORS.textDim, fontWeight: 500 },
+  weightControlGrid: { display: "grid", gridTemplateColumns: "1fr 76px", gap: 8, marginTop: 12 },
   measureInputGrid: { display: "grid", gridTemplateColumns: "1fr 92px", gap: 8 },
   measureRow: { display: "grid", gridTemplateColumns: "1fr auto 44px", gap: 8, alignItems: "center", padding: "8px 0", borderTop: `1px solid ${COLORS.cardBorder}`, fontSize: 14 },
 };
