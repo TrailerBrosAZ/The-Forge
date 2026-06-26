@@ -1855,15 +1855,15 @@ function AnatomyBody({ gender, side, fill, intensity }) {
 
 // ============ STYLE TOKENS ============
 const COLORS = { bg: "#15171A", card: "#1E2125", cardBorder: "#2A2E33", text: "#F2F0EB", textDim: "#8A8F98", amber: "#E8A33D", blue: "#5B9BD5", pink: "#D87BA8", red: "#E5604F", green: "#5FB87A" };
-const globalCss = `* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; } html { margin: 0; min-height: 100%; background: ${COLORS.bg}; overscroll-behavior: none; touch-action: manipulation; -webkit-text-size-adjust: 100%; } body { margin: 0; min-height: 100%; background: ${COLORS.bg}; overflow: hidden; overscroll-behavior: none; } #root { min-height: 100dvh; background: ${COLORS.bg}; } input, textarea, select { font-size: 16px; } input:focus, button:focus-visible, select:focus { outline: 2px solid ${COLORS.amber}; outline-offset: 1px; } input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; } @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }`;
+const globalCss = `* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; } html { margin: 0; width: 100%; height: 100%; background: ${COLORS.bg}; overflow: hidden; overscroll-behavior: none; touch-action: pan-y; -webkit-text-size-adjust: 100%; } body { margin: 0; width: 100%; height: 100%; background: ${COLORS.bg}; overflow: hidden; overscroll-behavior: none; touch-action: pan-y; } #root { width: 100%; height: 100dvh; background: ${COLORS.bg}; overflow: hidden; } input, textarea, select { font-size: 16px; } input:focus, button:focus-visible, select:focus { outline: 2px solid ${COLORS.amber}; outline-offset: 1px; } input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; } @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }`;
 const FONT_BODY = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 const FONT_NUM = "'SF Mono', 'Roboto Mono', ui-monospace, monospace";
 
 const styles = {
-  app: { minHeight: "100dvh", background: COLORS.bg, color: COLORS.text, fontFamily: FONT_BODY, display: "flex", flexDirection: "column", paddingTop: "env(safe-area-inset-top)" },
+  app: { height: "100dvh", background: COLORS.bg, color: COLORS.text, fontFamily: FONT_BODY, display: "flex", flexDirection: "column", paddingTop: "env(safe-area-inset-top)", overflow: "hidden" },
   loadingScreen: { minHeight: "100vh", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center" },
   loadingText: { color: COLORS.textDim, fontFamily: FONT_BODY },
-  content: { flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", paddingBottom: "calc(76px + env(safe-area-inset-bottom))" },
+  content: { flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch", overscrollBehaviorY: "contain", touchAction: "pan-y", paddingBottom: "calc(76px + env(safe-area-inset-bottom))" },
   tabContent: { padding: "12px 14px 16px", display: "flex", flexDirection: "column", gap: 12, maxWidth: 480, margin: "0 auto" },
   tabBar: { position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: COLORS.card, borderTop: `1px solid ${COLORS.cardBorder}`, padding: "8px 0 calc(14px + env(safe-area-inset-bottom))" },
   tabButton: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", background: "none", border: "none", cursor: "pointer", fontFamily: FONT_BODY },
