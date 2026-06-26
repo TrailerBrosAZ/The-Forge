@@ -35,6 +35,14 @@ function todayKey() {
 }
 function uid() { return Math.random().toString(36).slice(2, 10); }
 function titleCase(s) { return (s || "").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()); }
+function exerciseType(ex) { return ex?.type === "cardio" ? "cardio" : "strength"; }
+function newStrengthExercise() { return { type: "strength", n: "", ws: "3", r: "8", rpe: "", rest: "", note: "", mz: {} }; }
+function newCardioExercise() { return { type: "cardio", n: "", duration: "", intensity: "", note: "", mz: {} }; }
+function cardioSummary(exOrSet) {
+  const duration = exOrSet?.duration ? `${exOrSet.duration} min` : "duration open";
+  const intensity = exOrSet?.intensity ? ` · ${exOrSet.intensity}` : "";
+  return `${duration}${intensity}`;
+}
 function previousDateKey(dateKey) {
   const date = new Date(`${dateKey}T12:00:00`);
   date.setDate(date.getDate() - 1);
@@ -483,9 +491,21 @@ function PlanBuilder({ existing, createdBy, onCancel, onSave }) {
   function addDay() { setDays((prev) => [...prev, { d: prev.length + 1, focus: "", ex: [] }]); setOpenDay(days.length); }
   function removeDay(i) { setDays((prev) => prev.filter((_, idx) => idx !== i).map((d, idx) => ({ ...d, d: idx + 1 }))); }
   function setFocus(i, focus) { setDays((prev) => prev.map((d, idx) => idx === i ? { ...d, focus } : d)); }
-  function addExercise(i) { setDays((prev) => prev.map((d, idx) => idx === i ? { ...d, ex: [...d.ex, { n: "", ws: "3", r: "8", rpe: "", rest: "", note: "", mz: {} }] } : d)); }
+  function addExercise(i) { setDays((prev) => prev.map((d, idx) => idx === i ? { ...d, ex: [...d.ex, newStrengthExercise()] } : d)); }
+  function addCardio(i) { setDays((prev) => prev.map((d, idx) => idx === i ? { ...d, ex: [...d.ex, newCardioExercise()] } : d)); }
   function updateExercise(di, ei, field, val) {
     setDays((prev) => prev.map((d, idx) => idx === di ? { ...d, ex: d.ex.map((e, j) => j === ei ? { ...e, [field]: val } : e) } : d));
+  }
+  function setExerciseType(di, ei, type) {
+    setDays((prev) => prev.map((d, idx) => idx === di ? {
+      ...d,
+      ex: d.ex.map((e, j) => {
+        if (j !== ei) return e;
+        return type === "cardio"
+          ? { ...newCardioExercise(), n: e.n, duration: e.duration || "", intensity: e.intensity || "", note: e.note || "" }
+          : { ...newStrengthExercise(), n: e.n, ws: e.ws || "3", r: e.r || "8", rpe: e.rpe || "", rest: e.rest || "", note: e.note || "", mz: e.mz || {} };
+      })
+    } : d));
   }
   function removeExercise(di, ei) { setDays((prev) => prev.map((d, idx) => idx === di ? { ...d, ex: d.ex.filter((_, j) => j !== ei) } : d)); }
   function toggleZone(di, ei, zone) {
@@ -502,7 +522,16 @@ function PlanBuilder({ existing, createdBy, onCancel, onSave }) {
 
   function save() {
     if (!name.trim()) { alert("Give the plan a name."); return; }
-    const cleanDays = days.map((d, i) => ({ d: i + 1, focus: d.focus.trim() || `Day ${i + 1}`, ex: d.ex.filter((e) => e.n.trim()).map((e) => ({ ...e, n: e.n.trim() })) }));
+    const cleanDays = days.map((d, i) => ({
+      d: i + 1,
+      focus: d.focus.trim() || `Day ${i + 1}`,
+      ex: d.ex.filter((e) => e.n.trim()).map((e) => {
+        const base = { ...e, n: e.n.trim(), type: exerciseType(e) };
+        return base.type === "cardio"
+          ? { ...base, duration: String(base.duration || "").trim(), intensity: String(base.intensity || "").trim(), mz: {} }
+          : base;
+      })
+    }));
     if (cleanDays.every((d) => d.ex.length === 0)) { alert("Add at least one exercise."); return; }
     const plan = {
       id: existing?.id || uid(),
@@ -539,30 +568,58 @@ function PlanBuilder({ existing, createdBy, onCancel, onSave }) {
           {openDay === di && (
             <div style={{ marginTop: 10 }}>
               <input style={{ ...styles.input, marginBottom: 10 }} placeholder="Focus (e.g. Push, Legs)" value={day.focus} onChange={(e) => setFocus(di, e.target.value)} />
-              {day.ex.map((ex, ei) => (
-                <div key={ei} style={styles.exBuilderRow}>
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <input style={{ ...styles.input, flex: 1 }} placeholder="Exercise name" value={ex.n} onChange={(e) => updateExercise(di, ei, "n", e.target.value)} />
-                    <button style={styles.iconButton} onClick={() => removeExercise(di, ei)}><X size={16} color={COLORS.textDim} /></button>
-                  </div>
-                  <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                    {[["ws", "Sets"], ["r", "Reps"], ["rpe", "RPE"], ["rest", "Rest"]].map(([field, label]) => (
-                      <div key={field} style={{ flex: 1, minWidth: 0 }}>
-                        <div style={styles.miniLabel}>{label}</div>
-                        <input style={styles.miniInput} placeholder={field === "rest" ? "2-3m" : ""} value={ex[field]} onChange={(e) => updateExercise(di, ei, field, e.target.value)} />
+              {day.ex.map((ex, ei) => {
+                const type = exerciseType(ex);
+                return (
+                  <div key={ei} style={styles.exBuilderRow}>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      <input style={{ ...styles.input, flex: 1 }} placeholder={type === "cardio" ? "Cardio name" : "Exercise name"} value={ex.n} onChange={(e) => updateExercise(di, ei, "n", e.target.value)} />
+                      <button style={styles.iconButton} onClick={() => removeExercise(di, ei)}><X size={16} color={COLORS.textDim} /></button>
+                    </div>
+                    <div style={{ ...styles.modeSwitch, marginTop: 8, marginBottom: 0 }}>
+                      {["strength", "cardio"].map((m) => (
+                        <button key={m} style={{ ...styles.modeButton, ...(type === m ? styles.modeButtonActive : {}) }} onClick={() => setExerciseType(di, ei, m)}>
+                          {m === "strength" ? "Strength" : "Cardio"}
+                        </button>
+                      ))}
+                    </div>
+                    {type === "cardio" ? (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+                        <div>
+                          <div style={styles.miniLabel}>Duration</div>
+                          <input style={styles.miniInput} type="number" min="0" inputMode="decimal" placeholder="min" value={ex.duration || ""} onChange={(e) => updateExercise(di, ei, "duration", e.target.value)} />
+                        </div>
+                        <div>
+                          <div style={styles.miniLabel}>Intensity</div>
+                          <input style={{ ...styles.miniInput, fontFamily: FONT_BODY }} placeholder="optional" value={ex.intensity || ""} onChange={(e) => updateExercise(di, ei, "intensity", e.target.value)} />
+                        </div>
                       </div>
-                    ))}
+                    ) : (
+                      <>
+                        <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                          {[["ws", "Sets"], ["r", "Reps"], ["rpe", "RPE"], ["rest", "Rest"]].map(([field, label]) => (
+                            <div key={field} style={{ flex: 1, minWidth: 0 }}>
+                              <div style={styles.miniLabel}>{label}</div>
+                              <input style={styles.miniInput} placeholder={field === "rest" ? "2-3m" : ""} value={ex[field] || ""} onChange={(e) => updateExercise(di, ei, field, e.target.value)} />
+                            </div>
+                          ))}
+                        </div>
+                        <div style={styles.miniLabel}>Muscles worked (drives the body heatmap)</div>
+                        <div style={styles.zonePicker}>
+                          {ZONES.map((z) => (
+                            <button key={z} onClick={() => toggleZone(di, ei, z)}
+                              style={{ ...styles.zoneChip, ...(ex.mz && ex.mz[z] ? styles.zoneChipOn : {}) }}>{z}</button>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
-                  <div style={styles.miniLabel}>Muscles worked (drives the body heatmap)</div>
-                  <div style={styles.zonePicker}>
-                    {ZONES.map((z) => (
-                      <button key={z} onClick={() => toggleZone(di, ei, z)}
-                        style={{ ...styles.zoneChip, ...(ex.mz && ex.mz[z] ? styles.zoneChipOn : {}) }}>{z}</button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              <button style={{ ...styles.secondaryButton, marginTop: 8 }} onClick={() => addExercise(di)}><Plus size={14} style={{ verticalAlign: "-2px" }} /> Exercise</button>
+                );
+              })}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+                <button style={styles.secondaryButton} onClick={() => addExercise(di)}><Plus size={14} style={{ verticalAlign: "-2px" }} /> Exercise</button>
+                <button style={styles.secondaryButton} onClick={() => addCardio(di)}><Plus size={14} style={{ verticalAlign: "-2px" }} /> Cardio</button>
+              </div>
             </div>
           )}
         </div>
@@ -581,6 +638,9 @@ function PlanBuilder({ existing, createdBy, onCancel, onSave }) {
 // ============ ACTIVE PLAN RUNNER ============
 function logKeyFor(plan, dayId, exName, wk) {
   return plan.structure === "weeks" ? `${plan.id}|w${wk}|d${dayId}|${exName}` : `${plan.id}|d${dayId}|${exName}`;
+}
+function cardioLogKeyFor(plan, dayId, name, wk) {
+  return logKeyFor(plan, dayId, `cardio:${name}`, wk);
 }
 
 function ActivePlanRunner({ plan, workoutLogs, logExerciseSession, onChangePlan }) {
@@ -660,19 +720,40 @@ function ActivePlanRunner({ plan, workoutLogs, logExerciseSession, onChangePlan 
             <button key={m} style={{ ...styles.modeButton, ...(runMode === m ? styles.modeButtonActive : {}) }} onClick={() => setRunMode(m)}>{label}</button>
           ))}
         </div>
+        {runMode === "table" && day.ex.length === 0 && <QuickAddCardio onSave={(entry) => logExerciseSession(cardioLogKeyFor(plan, day.d, entry.name, wkNum), [{ type: "cardio", duration: entry.duration, intensity: entry.intensity, done: true }])} />}
         {runMode === "guided" && (
-          <GuidedWorkout
-            plan={plan} day={day} wkNum={wkNum} exercises={day.ex} workoutLogs={workoutLogs}
-            activeIndex={selEx} setActiveIndex={setSelEx}
-            onSaveExercise={(exercise, sets) => logExerciseSession(logKeyFor(plan, day.d, exercise.n, wkNum), sets)}
-          />
+          <>
+            <GuidedWorkout
+              plan={plan} day={day} wkNum={wkNum} exercises={day.ex} workoutLogs={workoutLogs}
+              activeIndex={selEx} setActiveIndex={setSelEx}
+              onSaveExercise={(exercise, sets) => logExerciseSession(logKeyFor(plan, day.d, exercise.n, wkNum), sets)}
+            />
+            <QuickAddCardio onSave={(entry) => logExerciseSession(cardioLogKeyFor(plan, day.d, entry.name, wkNum), [{ type: "cardio", duration: entry.duration, intensity: entry.intensity, done: true }])} />
+          </>
         )}
         {runMode === "table" && day.ex.map((e, ei) => {
           const log = workoutLogs[logKeyFor(plan, day.d, e.n, wkNum)];
           const last = log?.sessions?.[log.sessions.length - 1];
           const loggedToday = (log?.sessions || []).length > 0;
+          const type = exerciseType(e);
+          if (type === "cardio") {
+            return (
+              <React.Fragment key={ei}>
+              <button style={styles.exCard} onClick={() => { setSelEx(ei); setView("logger"); }}>
+                <div style={{ flex: 1, textAlign: "left" }}>
+                  <div style={styles.exCardName}>{titleCase(e.n)}{loggedToday && <Check size={14} color={COLORS.green} style={{ marginLeft: 6, verticalAlign: "-2px" }} />}</div>
+                  <div style={styles.exCardMeta}>{cardioSummary(e)}</div>
+                  {last && <div style={styles.exLastLine}>last: {cardioSummary(last.sets?.[0] || {})}</div>}
+                </div>
+                <ChevronRight size={18} color={COLORS.textDim} />
+              </button>
+              {ei === day.ex.length - 1 && <QuickAddCardio onSave={(entry) => logExerciseSession(cardioLogKeyFor(plan, day.d, entry.name, wkNum), [{ type: "cardio", duration: entry.duration, intensity: entry.intensity, done: true }])} />}
+              </React.Fragment>
+            );
+          }
           return (
-            <button key={ei} style={styles.exCard} onClick={() => { setSelEx(ei); setView("logger"); }}>
+            <React.Fragment key={ei}>
+            <button style={styles.exCard} onClick={() => { setSelEx(ei); setView("logger"); }}>
               <div style={{ flex: 1, textAlign: "left" }}>
                 <div style={styles.exCardName}>{titleCase(e.n)}{loggedToday && <Check size={14} color={COLORS.green} style={{ marginLeft: 6, verticalAlign: "-2px" }} />}</div>
                 <div style={styles.exCardMeta}>{e.ws} × {e.r}{e.rpe ? ` @ ${e.rpe}` : ""}{e.rest ? ` · ${e.rest.toLowerCase()}` : ""}</div>
@@ -680,6 +761,8 @@ function ActivePlanRunner({ plan, workoutLogs, logExerciseSession, onChangePlan 
               </div>
               <ChevronRight size={18} color={COLORS.textDim} />
             </button>
+            {ei === day.ex.length - 1 && <QuickAddCardio onSave={(entry) => logExerciseSession(cardioLogKeyFor(plan, day.d, entry.name, wkNum), [{ type: "cardio", duration: entry.duration, intensity: entry.intensity, done: true }])} />}
+            </React.Fragment>
           );
         })}
       </div>
@@ -719,6 +802,9 @@ function GuidedWorkout({ plan, day, wkNum, exercises, workoutLogs, activeIndex, 
   const targetSets = parseInt(ex?.ws) || 3;
   const [setIndex, setSetIndex] = useState(0);
   const [sets, setSets] = useState(() => todaySession?.sets || Array.from({ length: targetSets }, (_, i) => ({ weight: lastSession?.sets[i]?.weight || "", reps: lastSession?.sets[i]?.reps || ex?.r || "", note: "" })));
+  const [cardioDuration, setCardioDuration] = useState(todaySession?.sets?.[0]?.duration || ex?.duration || "");
+  const [cardioIntensity, setCardioIntensity] = useState(todaySession?.sets?.[0]?.intensity || ex?.intensity || "");
+  const [cardioError, setCardioError] = useState("");
   const [restLeft, setRestLeft] = useState(0);
 
   useEffect(() => {
@@ -730,7 +816,10 @@ function GuidedWorkout({ plan, day, wkNum, exercises, workoutLogs, activeIndex, 
     setSetIndex(0);
     setRestLeft(0);
     setSets(nextToday?.sets || Array.from({ length: nextTarget }, (_, i) => ({ weight: nextLast?.sets[i]?.weight || "", reps: nextLast?.sets[i]?.reps || ex?.r || "", note: "" })));
-  }, [activeIndex, day.d, ex?.n, ex?.r, ex?.ws, plan, wkNum, today]);
+    setCardioDuration(nextToday?.sets?.[0]?.duration || ex?.duration || "");
+    setCardioIntensity(nextToday?.sets?.[0]?.intensity || ex?.intensity || "");
+    setCardioError("");
+  }, [activeIndex, day.d, ex?.duration, ex?.intensity, ex?.n, ex?.r, ex?.ws, plan, wkNum, today]);
 
   useEffect(() => {
     if (restLeft <= 0) return;
@@ -739,6 +828,45 @@ function GuidedWorkout({ plan, day, wkNum, exercises, workoutLogs, activeIndex, 
   }, [restLeft]);
 
   if (!ex) return <div style={styles.emptyHint}>No exercises in this day.</div>;
+  if (exerciseType(ex) === "cardio") {
+    const completed = (log?.sessions || []).length > 0;
+    const progress = `${activeIndex + 1}/${exercises.length}`;
+    const saveCardio = () => {
+      if (!(Number(cardioDuration) > 0)) { setCardioError("Enter cardio duration in minutes."); return; }
+      setCardioError("");
+      onSaveExercise(ex, [{ type: "cardio", duration: String(cardioDuration).trim(), intensity: String(cardioIntensity || "").trim(), done: true }]);
+    };
+    return (
+      <div style={styles.guidedCard}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <div style={styles.dimLabel}>Exercise {progress}</div>
+          {completed && <span style={{ ...styles.badge, background: COLORS.green, color: COLORS.bg }}>Logged</span>}
+        </div>
+        <div style={styles.exTitle}>{titleCase(ex.n)}</div>
+        <div style={styles.exPrescription}>{cardioSummary(ex)}</div>
+        {lastSession && <div style={styles.exLastLine}>last: {cardioSummary(lastSession.sets?.[0] || {})}</div>}
+        <div style={styles.guidedSetBox}>
+          <div style={styles.cardHeader}>Cardio</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div>
+              <label style={styles.fieldLabel}>Duration</label>
+              <input style={styles.setInput} type="number" min="0" inputMode="decimal" placeholder="min" value={cardioDuration} onChange={(e) => setCardioDuration(e.target.value)} />
+            </div>
+            <div>
+              <label style={styles.fieldLabel}>Intensity</label>
+              <input style={{ ...styles.setInput, fontFamily: FONT_BODY }} placeholder="optional" value={cardioIntensity} onChange={(e) => setCardioIntensity(e.target.value)} />
+            </div>
+          </div>
+          {cardioError && <div role="alert" style={{ ...styles.dimLabel, color: COLORS.red, marginTop: 10 }}>{cardioError}</div>}
+          <button style={{ ...styles.primaryButton, width: "100%", marginTop: 12 }} onClick={saveCardio}>{completed ? "Update Cardio" : "Complete Cardio"}</button>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button style={styles.secondaryButton} disabled={activeIndex === 0} onClick={() => setActiveIndex(Math.max(0, activeIndex - 1))}>Previous</button>
+          <button style={styles.secondaryButton} disabled={activeIndex >= exercises.length - 1} onClick={() => setActiveIndex(Math.min(exercises.length - 1, activeIndex + 1))}>Next</button>
+        </div>
+      </div>
+    );
+  }
 
   const current = sets[setIndex] || { weight: "", reps: "", note: "" };
   const completed = (log?.sessions || []).length > 0;
@@ -810,7 +938,100 @@ function GuidedWorkout({ plan, day, wkNum, exercises, workoutLogs, activeIndex, 
   );
 }
 
+function QuickAddCardio({ onSave }) {
+  const [name, setName] = useState("");
+  const [duration, setDuration] = useState("");
+  const [intensity, setIntensity] = useState("");
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+
+  function save() {
+    const cleanName = name.trim();
+    const cleanDuration = duration.trim();
+    if (!cleanName) { setError("Name the cardio activity."); return; }
+    if (!(Number(cleanDuration) > 0)) { setError("Enter cardio duration in minutes."); return; }
+    onSave({ name: cleanName, duration: cleanDuration, intensity: intensity.trim() });
+    setError("");
+    setSaved(true);
+  }
+
+  return (
+    <div style={styles.card}>
+      <div style={styles.cardHeader}>Quick Add Cardio</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 92px", gap: 8 }}>
+        <input style={styles.input} placeholder="Treadmill, StairMaster" value={name} onChange={(e) => { setName(e.target.value); setSaved(false); }} />
+        <input style={{ ...styles.input, fontFamily: FONT_NUM, textAlign: "center" }} type="number" min="0" inputMode="decimal" placeholder="min" value={duration} onChange={(e) => { setDuration(e.target.value); setSaved(false); }} />
+      </div>
+      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+        <input style={{ ...styles.input, flex: 1 }} placeholder="Intensity (optional)" value={intensity} onChange={(e) => { setIntensity(e.target.value); setSaved(false); }} />
+        <button style={styles.primaryButton} onClick={save}>{saved ? "Saved" : "Add"}</button>
+      </div>
+      {error && <div role="alert" style={{ ...styles.dimLabel, color: COLORS.red, marginTop: 8 }}>{error}</div>}
+    </div>
+  );
+}
+
+function CardioLogger({ day, ex, log, onBack, onSave }) {
+  const today = todayKey();
+  const sessions = log?.sessions || [];
+  const lastSession = sessions.filter((s) => s.date !== today).slice(-1)[0];
+  const todaySession = sessions.find((s) => s.date === today);
+  const current = todaySession?.sets?.[0] || {};
+  const [duration, setDuration] = useState(current.duration || ex.duration || "");
+  const [intensity, setIntensity] = useState(current.intensity || ex.intensity || "");
+  const [showHistory, setShowHistory] = useState(false);
+  const [error, setError] = useState("");
+
+  function saveSession() {
+    const cleanDuration = String(duration).trim();
+    if (!(Number(cleanDuration) > 0)) { setError("Enter cardio duration in minutes."); return; }
+    setError("");
+    onSave([{ type: "cardio", duration: cleanDuration, intensity: String(intensity || "").trim(), done: true }]);
+  }
+
+  return (
+    <div style={styles.tabContent}>
+      <button style={styles.backRow} onClick={onBack}><ChevronLeft size={18} /> Day {day.d}</button>
+      <div style={styles.card}>
+        <div style={styles.exTitle}>{titleCase(ex.n)}</div>
+        <div style={styles.exPrescription}>{cardioSummary(ex)}</div>
+        {lastSession && <div style={styles.exLastLine}>last: {cardioSummary(lastSession.sets?.[0] || {})}</div>}
+      </div>
+      <div style={styles.card}>
+        <div style={styles.cardHeader}>Cardio Log</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div>
+            <label style={styles.fieldLabel}>Duration</label>
+            <input style={styles.setInput} type="number" min="0" inputMode="decimal" placeholder="min" value={duration} onChange={(e) => setDuration(e.target.value)} />
+          </div>
+          <div>
+            <label style={styles.fieldLabel}>Intensity</label>
+            <input style={{ ...styles.setInput, fontFamily: FONT_BODY }} placeholder="optional" value={intensity} onChange={(e) => setIntensity(e.target.value)} />
+          </div>
+        </div>
+        {error && <div role="alert" style={{ ...styles.dimLabel, color: COLORS.red, marginTop: 10 }}>{error}</div>}
+        <button style={{ ...styles.primaryButton, width: "100%", marginTop: 12 }} onClick={saveSession}>{todaySession ? "Update cardio" : "Save cardio"}</button>
+      </div>
+      {sessions.length > 0 && (
+        <div style={styles.card}>
+          <div style={styles.sectionHeader} onClick={() => setShowHistory((v) => !v)}>
+            <span style={styles.sectionTitle}>History</span>
+            {showHistory ? <ChevronUp size={16} color={COLORS.textDim} /> : <ChevronDown size={16} color={COLORS.textDim} />}
+          </div>
+          {showHistory && <div style={{ marginTop: 8 }}>{sessions.slice().reverse().map((s, i) => (
+            <div key={i} style={styles.histRow}><span style={styles.dimLabel}>{s.date}</span><span style={{ fontFamily: FONT_NUM, fontSize: 13 }}>{cardioSummary(s.sets?.[0] || {})}</span></div>
+          ))}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ExerciseLogger({ plan, day, ex, wkNum, isWeekly, week, log, onBack, onSave }) {
+  if (exerciseType(ex) === "cardio") {
+    return <CardioLogger day={day} ex={ex} log={log} onBack={onBack} onSave={onSave} />;
+  }
+
   const today = todayKey();
   const sessions = log?.sessions || [];
   const lastSession = sessions.filter((s) => s.date !== today).slice(-1)[0];
