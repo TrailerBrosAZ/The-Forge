@@ -274,7 +274,15 @@ function Main({ profile, profiles, setProfiles, plans, setPlans, onSwitchProfile
     setProfiles((prev) => prev.map((p) => p.id === profile.id ? { ...p, goalWeight } : p));
   }
   function addMeasurementEntry(entry) {
-    setMeasurements((prev) => [...prev.filter((m) => !(m.date === entry.date && m.part === entry.part)), entry].sort((a, b) => a.date.localeCompare(b.date)));
+    const kind = entry.kind || "circumference";
+    setMeasurements((prev) => [
+      ...prev.filter((m) => !(
+        m.date === entry.date &&
+        m.part === entry.part &&
+        (m.kind || "circumference") === kind
+      )),
+      { ...entry, kind }
+    ].sort((a, b) => a.date.localeCompare(b.date)));
   }
 
   return (
@@ -1701,9 +1709,39 @@ function heatColor(intensity) {
 }
 
 const BODY_MEASUREMENTS = [
-  "Left Arm", "Right Arm", "Chest", "Waist", "Navel", "Hips",
+  "Left Arm", "Right Arm", "Shoulders", "Chest", "Waist", "Navel", "Hips",
   "Left Thigh", "Right Thigh", "Left Calf", "Right Calf", "Neck"
 ];
+
+const MEASUREMENT_KINDS = {
+  circumference: { label: "Circumference", unit: "in" },
+  mass: { label: "Mass", unit: "lb" },
+};
+
+const MEASUREMENT_ANCHORS = {
+  "Neck": { x: 50, y: 17, labelX: 72, labelY: 15 },
+  "Shoulders": { x: 50, y: 26, labelX: 72, labelY: 25 },
+  "Chest": { x: 50, y: 35, labelX: 72, labelY: 35 },
+  "Left Arm": { x: 27, y: 38, labelX: 2, labelY: 36 },
+  "Right Arm": { x: 73, y: 38, labelX: 98, labelY: 36 },
+  "Waist": { x: 50, y: 50, labelX: 72, labelY: 49 },
+  "Navel": { x: 50, y: 55, labelX: 72, labelY: 57 },
+  "Hips": { x: 50, y: 62, labelX: 72, labelY: 66 },
+  "Left Thigh": { x: 40, y: 73, labelX: 4, labelY: 72 },
+  "Right Thigh": { x: 60, y: 73, labelX: 96, labelY: 72 },
+  "Left Calf": { x: 42, y: 89, labelX: 5, labelY: 89 },
+  "Right Calf": { x: 58, y: 89, labelX: 95, labelY: 89 },
+};
+
+function normalizeMeasurement(m) {
+  const kind = m.kind || "circumference";
+  return { ...m, kind, unit: m.unit || MEASUREMENT_KINDS[kind]?.unit || "in" };
+}
+
+function formatMeasurementValue(m) {
+  const value = Number.isFinite(m.value) ? m.value.toFixed(1).replace(/\.0$/, "") : m.value;
+  return m.kind === "mass" ? `${value} ${m.unit} mass` : `${value} ${m.unit}`;
+}
 
 function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightEntry, saveGoalWeight, measurements, addMeasurementEntry }) {
   const [side, setSide] = useState("front");
@@ -1711,6 +1749,7 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
   const [weightVal, setWeightVal] = useState("");
   const [goalInput, setGoalInput] = useState(profile.goalWeight ?? "");
   const [measurePart, setMeasurePart] = useState("Waist");
+  const [measureKind, setMeasureKind] = useState("circumference");
   const [measureVal, setMeasureVal] = useState("");
   const gender = profile.gender || "male";
   const heat = computeHeatmap(workoutLogs, plans, windowDays);
@@ -1723,11 +1762,13 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
   const sortedWeights = [...(weights || [])].sort((a, b) => a.date.localeCompare(b.date));
   const latestWeight = sortedWeights[sortedWeights.length - 1], priorWeight = sortedWeights[sortedWeights.length - 2];
   const weightDelta = latestWeight && priorWeight ? latestWeight.lbs - priorWeight.lbs : null;
-  const latestByPart = BODY_MEASUREMENTS.map((part) => {
-    const rows = (measurements || []).filter((m) => m.part === part).sort((a, b) => a.date.localeCompare(b.date));
+  const normalizedMeasurements = (measurements || []).map(normalizeMeasurement);
+  const latestMetrics = BODY_MEASUREMENTS.flatMap((part) => Object.keys(MEASUREMENT_KINDS).map((kind) => {
+    const rows = normalizedMeasurements.filter((m) => m.part === part && m.kind === kind).sort((a, b) => a.date.localeCompare(b.date));
     const latest = rows[rows.length - 1], prev = rows[rows.length - 2];
-    return { part, latest, prev, delta: latest && prev ? latest.value - prev.value : null };
-  }).filter((m) => m.latest);
+    return { part, kind, latest, prev, delta: latest && prev ? latest.value - prev.value : null };
+  })).filter((m) => m.latest);
+  const measureUnit = MEASUREMENT_KINDS[measureKind].unit;
 
   return (
     <div style={styles.tabContent}>
@@ -1757,21 +1798,17 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
 
       <div style={styles.card}>
         <div style={styles.cardHeader}>Measurements</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 90px", gap: 8 }}>
-          <select value={measurePart} onChange={(e) => setMeasurePart(e.target.value)} style={styles.input}>
+        <div style={styles.measureInputGrid}>
+          <select value={measurePart} onChange={(e) => setMeasurePart(e.target.value)} style={{ ...styles.input, gridColumn: "1 / -1" }}>
             {BODY_MEASUREMENTS.map((part) => <option key={part} value={part}>{part}</option>)}
           </select>
-          <input type="number" step="0.1" placeholder="in" value={measureVal} onChange={(e) => setMeasureVal(e.target.value)} style={styles.input} />
+          <select value={measureKind} onChange={(e) => setMeasureKind(e.target.value)} style={styles.input}>
+            {Object.entries(MEASUREMENT_KINDS).map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}
+          </select>
+          <input type="number" step="0.1" placeholder={measureUnit} value={measureVal} onChange={(e) => setMeasureVal(e.target.value)} style={styles.input} />
         </div>
-        <button style={{ ...styles.primaryButton, width: "100%", marginTop: 10 }} onClick={() => { if (!measureVal) return; addMeasurementEntry({ date: todayKey(), part: measurePart, value: Number(measureVal) }); setMeasureVal(""); }}>Log Measurement</button>
-        {latestByPart.length === 0 && <div style={styles.emptyHint}>No measurements logged yet.</div>}
-        {latestByPart.map((m) => (
-          <div key={m.part} style={styles.measureRow}>
-            <span>{m.part}</span>
-            <span style={styles.tabularNum}>{m.latest.value} in</span>
-            <span style={{ ...styles.dimLabel, color: m.delta == null ? COLORS.textDim : m.delta > 0 ? COLORS.amber : COLORS.blue }}>{m.delta == null ? "new" : `${m.delta > 0 ? "+" : ""}${m.delta.toFixed(1)}`}</span>
-          </div>
-        ))}
+        <button style={{ ...styles.primaryButton, width: "100%", marginTop: 10 }} onClick={() => { if (!measureVal) return; addMeasurementEntry({ date: todayKey(), part: measurePart, kind: measureKind, unit: measureUnit, value: Number(measureVal) }); setMeasureVal(""); }}>Log Measurement</button>
+        <div style={styles.emptyHint}>{latestMetrics.length === 0 ? "No measurements logged yet." : "Latest measurements appear as callouts on the body map."}</div>
       </div>
 
       <div style={styles.screenTitle}>Muscle Heatmap</div>
@@ -1792,13 +1829,29 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
       </div>
 
       <div style={styles.bodyCard}>
-        <AnatomyBody gender={gender} side={side} fill={fill} intensity={intensity} />
+        <div style={styles.bodyVisualWrap}>
+          <AnatomyBody gender={gender} side={side} fill={fill} intensity={intensity} />
+          <MeasurementCallouts metrics={latestMetrics} />
+        </div>
         <div style={styles.legendRow}>
           <span style={styles.dimLabel}>less</span>
           <div style={styles.legendBar} />
           <span style={styles.dimLabel}>more</span>
         </div>
       </div>
+
+      {latestMetrics.length > 0 && (
+        <div style={styles.card}>
+          <div style={styles.cardHeader}>Latest Measurements</div>
+          {latestMetrics.map((m) => (
+            <div key={`${m.part}-${m.kind}`} style={styles.measureRow}>
+              <span>{m.part}</span>
+              <span style={styles.tabularNum}>{formatMeasurementValue(m.latest)}</span>
+              <span style={{ ...styles.dimLabel, color: m.delta == null ? COLORS.textDim : m.delta > 0 ? COLORS.amber : COLORS.blue }}>{m.delta == null ? "new" : `${m.delta > 0 ? "+" : ""}${m.delta.toFixed(1)}`}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div style={styles.card}>
         <div style={styles.cardHeader}>Sets by muscle · {windowDays === 3650 ? "all time" : `last ${windowDays} days`}</div>
@@ -1812,6 +1865,49 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
         ))}
       </div>
       <div style={styles.helpNote}>Intensity is working-set volume per muscle in the window. Blue is light, red is heavily worked. Untouched muscles stay dark.</div>
+    </div>
+  );
+}
+
+function MeasurementCallouts({ metrics }) {
+  const groups = BODY_MEASUREMENTS.map((part) => ({
+    part,
+    anchor: MEASUREMENT_ANCHORS[part],
+    metrics: metrics.filter((m) => m.part === part),
+  })).filter((group) => group.anchor && group.metrics.length > 0);
+
+  return (
+    <div style={styles.measureCalloutLayer} aria-hidden="true">
+      {groups.map(({ part, anchor, metrics: partMetrics }) => {
+        const alignRight = anchor.labelX < anchor.x;
+        const midX = (anchor.x + anchor.labelX) / 2;
+        return (
+          <div key={part}>
+            <div style={{ ...styles.measureAnchorDot, left: `${anchor.x}%`, top: `${anchor.y}%` }} />
+            <div
+              style={{
+                ...styles.measureConnector,
+                left: `${Math.min(anchor.x, anchor.labelX)}%`,
+                top: `${anchor.y}%`,
+                width: `${Math.max(7, Math.abs(anchor.labelX - anchor.x))}%`,
+              }}
+            />
+            <div style={{ ...styles.measureConnectorDot, left: `${midX}%`, top: `${anchor.y}%` }} />
+            <div
+              style={{
+                ...styles.measureCallout,
+                left: `${anchor.labelX}%`,
+                top: `${anchor.labelY}%`,
+                transform: alignRight ? "translate(-100%, -50%)" : "translate(0, -50%)",
+                textAlign: alignRight ? "right" : "left",
+              }}
+            >
+              <div style={styles.measureCalloutTitle}>{part}</div>
+              {partMetrics.map((m) => <div key={m.kind} style={styles.measureCalloutValue}>{formatMeasurementValue(m.latest)}</div>)}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1987,9 +2083,18 @@ const styles = {
   segBtn: { flex: 1, background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 8, padding: "8px 0", fontSize: 13, color: COLORS.textDim, cursor: "pointer", fontFamily: FONT_BODY },
   segBtnOn: { color: COLORS.bg, background: COLORS.amber, borderColor: COLORS.amber, fontWeight: 600 },
   bodyCard: { background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 14, padding: 16, display: "flex", flexDirection: "column", alignItems: "center" },
+  bodyVisualWrap: { position: "relative", width: "100%", maxWidth: 440, display: "flex", justifyContent: "center" },
   bodySvg: { width: "100%", maxWidth: 260, height: "auto", maxHeight: 440 },
+  measureCalloutLayer: { position: "absolute", inset: 0, pointerEvents: "none" },
+  measureAnchorDot: { position: "absolute", width: 7, height: 7, marginLeft: -3.5, marginTop: -3.5, borderRadius: "50%", background: COLORS.amber, boxShadow: `0 0 0 3px ${COLORS.amberSoft}` },
+  measureConnector: { position: "absolute", height: 1, background: COLORS.amberSoft, transform: "translateY(-0.5px)" },
+  measureConnectorDot: { position: "absolute", width: 3, height: 3, marginLeft: -1.5, marginTop: -1.5, borderRadius: "50%", background: COLORS.amberSoft },
+  measureCallout: { position: "absolute", minWidth: 74, maxWidth: 118, padding: "5px 7px", borderRadius: 8, background: "rgba(19, 21, 26, 0.88)", border: `1px solid ${COLORS.cardBorder}`, boxShadow: "0 8px 18px rgba(0,0,0,0.22)" },
+  measureCalloutTitle: { fontSize: 10, lineHeight: 1.15, color: COLORS.textDim, fontWeight: 600 },
+  measureCalloutValue: { fontSize: 12, lineHeight: 1.2, color: COLORS.text, fontFamily: FONT_NUM },
   legendRow: { display: "flex", alignItems: "center", gap: 8, marginTop: 8 },
   legendBar: { width: 120, height: 8, borderRadius: 4, background: "linear-gradient(90deg, #5B9BD5, #E8A33D, #E5604F)" },
   zoneStatRow: { display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: `1px solid ${COLORS.cardBorder}` },
+  measureInputGrid: { display: "grid", gridTemplateColumns: "1fr 92px", gap: 8 },
   measureRow: { display: "grid", gridTemplateColumns: "1fr auto 44px", gap: 8, alignItems: "center", padding: "8px 0", borderTop: `1px solid ${COLORS.cardBorder}`, fontSize: 14 },
 };
