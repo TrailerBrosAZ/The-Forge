@@ -302,7 +302,7 @@ function Main({ profile, profiles, setProfiles, plans, setPlans, onSwitchProfile
         )}
         {tab === "body" && <BodyTab workoutLogs={workoutLogs} plans={plans} profile={profile} setProfiles={setProfiles}
           weights={weights} addWeightEntry={addWeightEntry} saveGoalWeight={saveGoalWeight}
-          measurements={measurements} addMeasurementEntry={addMeasurementEntry} />}
+          measurements={measurements} addMeasurementEntry={addMeasurementEntry} onGoTrain={() => setTab("train")} />}
         {tab === "food" && (
           <FoodTab totals={totals} targets={targets} setTargets={updateTargets} todaysEntries={todaysEntries}
             dayLog={dayLog} copyPreviousDay={copyPreviousDay}
@@ -1709,9 +1709,17 @@ function heatColor(intensity) {
 }
 
 const BODY_MEASUREMENTS = [
-  "Left Arm", "Right Arm", "Shoulders", "Chest", "Waist", "Navel", "Hips",
-  "Left Thigh", "Right Thigh", "Left Calf", "Right Calf", "Neck"
+  "Left Arm", "Right Arm", "Left Leg", "Right Leg", "Shoulders", "Chest", "Waist", "Torso"
 ];
+
+const BODY_MEASUREMENT_ALIASES = {
+  "Left Thigh": "Left Leg",
+  "Left Calf": "Left Leg",
+  "Right Thigh": "Right Leg",
+  "Right Calf": "Right Leg",
+  "Navel": "Torso",
+  "Hips": "Waist",
+};
 
 const MEASUREMENT_KINDS = {
   circumference: { label: "Circumference", unit: "in" },
@@ -1719,23 +1727,20 @@ const MEASUREMENT_KINDS = {
 };
 
 const MEASUREMENT_ANCHORS = {
-  "Neck": { x: 50, y: 17, labelX: 72, labelY: 15 },
-  "Shoulders": { x: 50, y: 26, labelX: 72, labelY: 25 },
-  "Chest": { x: 50, y: 35, labelX: 72, labelY: 35 },
-  "Left Arm": { x: 27, y: 38, labelX: 2, labelY: 36 },
-  "Right Arm": { x: 73, y: 38, labelX: 98, labelY: 36 },
-  "Waist": { x: 50, y: 50, labelX: 72, labelY: 49 },
-  "Navel": { x: 50, y: 55, labelX: 72, labelY: 57 },
-  "Hips": { x: 50, y: 62, labelX: 72, labelY: 66 },
-  "Left Thigh": { x: 40, y: 73, labelX: 4, labelY: 72 },
-  "Right Thigh": { x: 60, y: 73, labelX: 96, labelY: 72 },
-  "Left Calf": { x: 42, y: 89, labelX: 5, labelY: 89 },
-  "Right Calf": { x: 58, y: 89, labelX: 95, labelY: 89 },
+  "Shoulders": { x: 50, y: 27, labelX: 65, labelY: 24 },
+  "Chest": { x: 50, y: 36, labelX: 66, labelY: 36 },
+  "Left Arm": { x: 37, y: 40, labelX: 24, labelY: 38 },
+  "Right Arm": { x: 63, y: 40, labelX: 76, labelY: 38 },
+  "Waist": { x: 50, y: 50, labelX: 63, labelY: 50 },
+  "Torso": { x: 50, y: 56, labelX: 64, labelY: 59 },
+  "Left Leg": { x: 43, y: 75, labelX: 29, labelY: 75 },
+  "Right Leg": { x: 57, y: 75, labelX: 71, labelY: 75 },
 };
 
 function normalizeMeasurement(m) {
   const kind = m.kind || "circumference";
-  return { ...m, kind, unit: m.unit || MEASUREMENT_KINDS[kind]?.unit || "in" };
+  const part = BODY_MEASUREMENT_ALIASES[m.part] || m.part;
+  return { ...m, part, kind, unit: m.unit || MEASUREMENT_KINDS[kind]?.unit || "in" };
 }
 
 function formatMeasurementValue(m) {
@@ -1743,7 +1748,7 @@ function formatMeasurementValue(m) {
   return m.kind === "mass" ? `${value} ${m.unit} mass` : `${value} ${m.unit}`;
 }
 
-function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightEntry, saveGoalWeight, measurements, addMeasurementEntry }) {
+function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightEntry, saveGoalWeight, measurements, addMeasurementEntry, onGoTrain }) {
   const [side, setSide] = useState("front");
   const [windowDays, setWindowDays] = useState(7);
   const [weightVal, setWeightVal] = useState("");
@@ -1751,6 +1756,7 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
   const [measurePart, setMeasurePart] = useState("Waist");
   const [measureKind, setMeasureKind] = useState("circumference");
   const [measureVal, setMeasureVal] = useState("");
+  const measurementFormRef = useRef(null);
   const gender = profile.gender || "male";
   const heat = computeHeatmap(workoutLogs, plans, windowDays);
   const max = Math.max(1, ...Object.values(heat));
@@ -1769,10 +1775,57 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
     return { part, kind, latest, prev, delta: latest && prev ? latest.value - prev.value : null };
   })).filter((m) => m.latest);
   const measureUnit = MEASUREMENT_KINDS[measureKind].unit;
+  function chooseMeasurementPart(part) {
+    setMeasurePart(part);
+    measurementFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
 
   return (
     <div style={styles.tabContent}>
       <div style={styles.screenTitle}>Body</div>
+
+      <div style={styles.bodyCard}>
+        <div style={styles.bodyVisualWrap}>
+          <AnatomyBody gender={gender} side={side} fill={fill} intensity={intensity} />
+          <MeasurementCallouts metrics={latestMetrics} onSelectPart={chooseMeasurementPart} />
+        </div>
+        <div style={styles.legendRow}>
+          <span style={styles.dimLabel}>less</span>
+          <div style={styles.legendBar} />
+          <span style={styles.dimLabel}>more</span>
+        </div>
+        <div style={styles.heatmapControls}>
+          <div style={styles.segRow}>
+            {[["front", "Front"], ["back", "Back"]].map(([v, l]) => (
+              <button key={v} style={{ ...styles.segBtn, ...(side === v ? styles.segBtnOn : {}) }} onClick={() => setSide(v)}>{l}</button>
+            ))}
+          </div>
+          <div style={styles.segRow}>
+            {[[7, "7 days"], [30, "30 days"], [3650, "All time"]].map(([v, l]) => (
+              <button key={v} style={{ ...styles.segBtn, ...(windowDays === v ? styles.segBtnOn : {}) }} onClick={() => setWindowDays(v)}>{l}</button>
+            ))}
+          </div>
+          <div style={styles.segRow}>
+            {[["male", "Male"], ["female", "Female"]].map(([v, l]) => (
+              <button key={v} style={{ ...styles.segBtn, ...(gender === v ? styles.segBtnOn : {}) }} onClick={() => setGender(v)}>{l}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={styles.card}>
+        <div style={styles.cardHeader}>Sets by muscle · {windowDays === 3650 ? "all time" : `last ${windowDays} days`}</div>
+        {ranked.length === 0 && <button style={styles.linkButton} onClick={onGoTrain}>Log a workout to build your heatmap</button>}
+        {ranked.map(([z, v]) => (
+          <div key={z} style={styles.zoneStatRow}>
+            <div style={{ width: 10, height: 10, borderRadius: 2, background: heatColor((v / max)) }} />
+            <span style={{ flex: 1, textTransform: "capitalize", fontSize: 14 }}>{z}</span>
+            <span style={styles.tabularNum}>{Math.round(v)}</span>
+          </div>
+        ))}
+      </div>
+      <div style={styles.helpNote}>Intensity is working-set volume per muscle in the window. Blue is light, red is heavily worked. Untouched muscles stay dark.</div>
+
       <div style={styles.card}>
         <div style={styles.cardHeader}>Weight</div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -1796,7 +1849,7 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
       </div>
       {sortedWeights.length > 0 && <div style={styles.card}><div style={styles.cardHeader}>Weight Trend</div><WeightChart sorted={sortedWeights} goalWeight={profile.goalWeight} /></div>}
 
-      <div style={styles.card}>
+      <div ref={measurementFormRef} style={styles.card}>
         <div style={styles.cardHeader}>Measurements</div>
         <div style={styles.measureInputGrid}>
           <select value={measurePart} onChange={(e) => setMeasurePart(e.target.value)} style={{ ...styles.input, gridColumn: "1 / -1" }}>
@@ -1808,36 +1861,7 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
           <input type="number" step="0.1" placeholder={measureUnit} value={measureVal} onChange={(e) => setMeasureVal(e.target.value)} style={styles.input} />
         </div>
         <button style={{ ...styles.primaryButton, width: "100%", marginTop: 10 }} onClick={() => { if (!measureVal) return; addMeasurementEntry({ date: todayKey(), part: measurePart, kind: measureKind, unit: measureUnit, value: Number(measureVal) }); setMeasureVal(""); }}>Log Measurement</button>
-        <div style={styles.emptyHint}>{latestMetrics.length === 0 ? "No measurements logged yet." : "Latest measurements appear as callouts on the body map."}</div>
-      </div>
-
-      <div style={styles.screenTitle}>Muscle Heatmap</div>
-      <div style={styles.segRow}>
-        {[["front", "Front"], ["back", "Back"]].map(([v, l]) => (
-          <button key={v} style={{ ...styles.segBtn, ...(side === v ? styles.segBtnOn : {}) }} onClick={() => setSide(v)}>{l}</button>
-        ))}
-      </div>
-      <div style={styles.segRow}>
-        {[[7, "7 days"], [30, "30 days"], [3650, "All time"]].map(([v, l]) => (
-          <button key={v} style={{ ...styles.segBtn, ...(windowDays === v ? styles.segBtnOn : {}) }} onClick={() => setWindowDays(v)}>{l}</button>
-        ))}
-      </div>
-      <div style={styles.segRow}>
-        {[["male", "Male"], ["female", "Female"]].map(([v, l]) => (
-          <button key={v} style={{ ...styles.segBtn, ...(gender === v ? styles.segBtnOn : {}) }} onClick={() => setGender(v)}>{l}</button>
-        ))}
-      </div>
-
-      <div style={styles.bodyCard}>
-        <div style={styles.bodyVisualWrap}>
-          <AnatomyBody gender={gender} side={side} fill={fill} intensity={intensity} />
-          <MeasurementCallouts metrics={latestMetrics} />
-        </div>
-        <div style={styles.legendRow}>
-          <span style={styles.dimLabel}>less</span>
-          <div style={styles.legendBar} />
-          <span style={styles.dimLabel}>more</span>
-        </div>
+        <div style={styles.emptyHint}>{latestMetrics.length === 0 ? "No measurements logged yet." : "Tap a body label above to preselect that measurement."}</div>
       </div>
 
       {latestMetrics.length > 0 && (
@@ -1852,24 +1876,11 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
           ))}
         </div>
       )}
-
-      <div style={styles.card}>
-        <div style={styles.cardHeader}>Sets by muscle · {windowDays === 3650 ? "all time" : `last ${windowDays} days`}</div>
-        {ranked.length === 0 && <button style={styles.linkButton} onClick={onGoTrain}>Log a workout to build your heatmap</button>}
-        {ranked.map(([z, v]) => (
-          <div key={z} style={styles.zoneStatRow}>
-            <div style={{ width: 10, height: 10, borderRadius: 2, background: heatColor((v / max)) }} />
-            <span style={{ flex: 1, textTransform: "capitalize", fontSize: 14 }}>{z}</span>
-            <span style={styles.tabularNum}>{Math.round(v)}</span>
-          </div>
-        ))}
-      </div>
-      <div style={styles.helpNote}>Intensity is working-set volume per muscle in the window. Blue is light, red is heavily worked. Untouched muscles stay dark.</div>
     </div>
   );
 }
 
-function MeasurementCallouts({ metrics }) {
+function MeasurementCallouts({ metrics, onSelectPart }) {
   const groups = BODY_MEASUREMENTS.map((part) => ({
     part,
     anchor: MEASUREMENT_ANCHORS[part],
@@ -1877,23 +1888,29 @@ function MeasurementCallouts({ metrics }) {
   })).filter((group) => group.anchor && group.metrics.length > 0);
 
   return (
-    <div style={styles.measureCalloutLayer} aria-hidden="true">
+    <div style={styles.measureCalloutLayer}>
       {groups.map(({ part, anchor, metrics: partMetrics }) => {
+        const dx = anchor.labelX - anchor.x;
+        const dy = anchor.labelY - anchor.y;
+        const width = Math.max(7, Math.sqrt(dx * dx + dy * dy));
+        const angle = Math.atan2(dy, dx) * 180 / Math.PI;
         const alignRight = anchor.labelX < anchor.x;
-        const midX = (anchor.x + anchor.labelX) / 2;
         return (
           <div key={part}>
             <div style={{ ...styles.measureAnchorDot, left: `${anchor.x}%`, top: `${anchor.y}%` }} />
             <div
               style={{
                 ...styles.measureConnector,
-                left: `${Math.min(anchor.x, anchor.labelX)}%`,
+                left: `${anchor.x}%`,
                 top: `${anchor.y}%`,
-                width: `${Math.max(7, Math.abs(anchor.labelX - anchor.x))}%`,
+                width: `${width}%`,
+                transform: `rotate(${angle}deg)`,
               }}
             />
-            <div style={{ ...styles.measureConnectorDot, left: `${midX}%`, top: `${anchor.y}%` }} />
-            <div
+            <button
+              type="button"
+              aria-label={`Update ${part} measurement`}
+              onClick={() => onSelectPart?.(part)}
               style={{
                 ...styles.measureCallout,
                 left: `${anchor.labelX}%`,
@@ -1904,7 +1921,7 @@ function MeasurementCallouts({ metrics }) {
             >
               <div style={styles.measureCalloutTitle}>{part}</div>
               {partMetrics.map((m) => <div key={m.kind} style={styles.measureCalloutValue}>{formatMeasurementValue(m.latest)}</div>)}
-            </div>
+            </button>
           </div>
         );
       })}
@@ -2082,18 +2099,18 @@ const styles = {
   segRow: { display: "flex", gap: 6 },
   segBtn: { flex: 1, background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 8, padding: "8px 0", fontSize: 13, color: COLORS.textDim, cursor: "pointer", fontFamily: FONT_BODY },
   segBtnOn: { color: COLORS.bg, background: COLORS.amber, borderColor: COLORS.amber, fontWeight: 600 },
-  bodyCard: { background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 14, padding: 16, display: "flex", flexDirection: "column", alignItems: "center" },
-  bodyVisualWrap: { position: "relative", width: "100%", maxWidth: 440, display: "flex", justifyContent: "center" },
+  bodyCard: { background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 14, padding: 14, display: "flex", flexDirection: "column", alignItems: "center" },
+  bodyVisualWrap: { position: "relative", width: "100%", maxWidth: 400, display: "flex", justifyContent: "center" },
   bodySvg: { width: "100%", maxWidth: 260, height: "auto", maxHeight: 440 },
   measureCalloutLayer: { position: "absolute", inset: 0, pointerEvents: "none" },
   measureAnchorDot: { position: "absolute", width: 7, height: 7, marginLeft: -3.5, marginTop: -3.5, borderRadius: "50%", background: COLORS.amber, boxShadow: `0 0 0 3px ${COLORS.amberSoft}` },
-  measureConnector: { position: "absolute", height: 1, background: COLORS.amberSoft, transform: "translateY(-0.5px)" },
-  measureConnectorDot: { position: "absolute", width: 3, height: 3, marginLeft: -1.5, marginTop: -1.5, borderRadius: "50%", background: COLORS.amberSoft },
-  measureCallout: { position: "absolute", minWidth: 74, maxWidth: 118, padding: "5px 7px", borderRadius: 8, background: "rgba(19, 21, 26, 0.88)", border: `1px solid ${COLORS.cardBorder}`, boxShadow: "0 8px 18px rgba(0,0,0,0.22)" },
-  measureCalloutTitle: { fontSize: 10, lineHeight: 1.15, color: COLORS.textDim, fontWeight: 600 },
+  measureConnector: { position: "absolute", height: 0, borderTop: `1px dotted ${COLORS.amber}`, opacity: 0.8, transformOrigin: "0 50%" },
+  measureCallout: { position: "absolute", minWidth: 76, maxWidth: 112, padding: "5px 7px", borderRadius: 8, background: "rgba(19, 21, 26, 0.92)", border: `1px solid ${COLORS.cardBorder}`, boxShadow: "0 8px 18px rgba(0,0,0,0.22)", color: COLORS.text, fontFamily: FONT_BODY, cursor: "pointer", pointerEvents: "auto" },
+  measureCalloutTitle: { fontSize: 10, lineHeight: 1.15, color: COLORS.textDim, fontWeight: 700 },
   measureCalloutValue: { fontSize: 12, lineHeight: 1.2, color: COLORS.text, fontFamily: FONT_NUM },
   legendRow: { display: "flex", alignItems: "center", gap: 8, marginTop: 8 },
   legendBar: { width: 120, height: 8, borderRadius: 4, background: "linear-gradient(90deg, #5B9BD5, #E8A33D, #E5604F)" },
+  heatmapControls: { width: "100%", display: "grid", gap: 7, marginTop: 10 },
   zoneStatRow: { display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: `1px solid ${COLORS.cardBorder}` },
   measureInputGrid: { display: "grid", gridTemplateColumns: "1fr 92px", gap: 8 },
   measureRow: { display: "grid", gridTemplateColumns: "1fr auto 44px", gap: 8, alignItems: "center", padding: "8px 0", borderTop: `1px solid ${COLORS.cardBorder}`, fontSize: 14 },
