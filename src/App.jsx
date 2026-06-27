@@ -1159,12 +1159,12 @@ function FoodTab({ totals, targets, setTargets, todaysEntries, dayLog, copyPrevi
   return (
     <div style={styles.tabContent}>
       <DailySummary totals={totals} targets={targets} remaining={remaining} onEditTargets={() => setEditingTargets(true)} />
-      <NutritionHistory dayLog={dayLog} targets={targets} />
       {editingTargets && <TargetsEditor targets={targets} setTargets={setTargets} onClose={() => setEditingTargets(false)} />}
       {todayIsEmpty && canCopyYesterday && <button style={styles.secondaryButton} onClick={copyPreviousDay}><Copy size={15} style={{ verticalAlign: "-3px", marginRight: 6 }} />Copy yesterday</button>}
       {MEAL_SECTIONS.map((sec) => (
         <MealSection key={sec.id} section={sec} items={todaysEntries[sec.id] || []} onAdd={() => setActiveAdd(sec.id)} onRemove={(id) => removeEntry(sec.id, id)} />
       ))}
+      <NutritionHistory dayLog={dayLog} targets={targets} />
       {activeAdd && <AddFoodModal sectionLabel={MEAL_SECTIONS.find((s) => s.id === activeAdd)?.label} myFoods={myFoods} recentFoods={recentFoods} deleteFood={deleteFood} servingPrefs={servingPrefs} onClose={() => setActiveAdd(null)} onAdd={(entry, save) => { addEntry(activeAdd, entry); if (save) saveCustomFood(entry); setActiveAdd(null); }} onSaveRecipe={(recipe) => { saveCustomFood(recipe); }} />}
     </div>
   );
@@ -1219,17 +1219,24 @@ function NutritionHistory({ dayLog, targets }) {
 
 function DailySummary({ totals, targets, remaining, onEditTargets }) {
   const proteinKcal = totals.protein * 4, carbsKcal = totals.carbs * 4, fatKcal = totals.fat * 9;
-  const totalKcal = Math.max(proteinKcal + carbsKcal + fatKcal, 1);
+  const caloriePct = Math.min(Math.max((totals.calories || 0) / (targets.calories || 1), 0), 1);
   return (
     <div style={styles.card}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <div><div style={styles.bigNumber}>{Math.round(totals.calories)}</div><div style={styles.dimLabel}>of {targets.calories} cal</div></div>
-        <div style={{ textAlign: "right" }}><div style={{ ...styles.bigNumber, color: remaining < 0 ? COLORS.red : COLORS.amber, fontSize: 22 }}>{remaining >= 0 ? remaining : `+${Math.abs(remaining)}`}</div><div style={styles.dimLabel}>{remaining >= 0 ? "remaining" : "over"}</div></div>
-      </div>
-      <div style={styles.stackedBarTrack}>
-        <div style={{ ...styles.stackedBarSeg, width: `${(proteinKcal / totalKcal) * 100}%`, background: COLORS.blue }} />
-        <div style={{ ...styles.stackedBarSeg, width: `${(carbsKcal / totalKcal) * 100}%`, background: COLORS.amber }} />
-        <div style={{ ...styles.stackedBarSeg, width: `${(fatKcal / totalKcal) * 100}%`, background: COLORS.pink }} />
+      <div style={styles.foodSummaryTop}>
+        <MacroCalorieRing
+          calories={totals.calories}
+          targetCalories={targets.calories}
+          proteinKcal={proteinKcal}
+          carbsKcal={carbsKcal}
+          fatKcal={fatKcal}
+        />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+            <div><div style={styles.bigNumber}>{Math.round(totals.calories)}</div><div style={styles.dimLabel}>of {targets.calories} cal</div></div>
+            <div style={{ textAlign: "right" }}><div style={{ ...styles.bigNumber, color: remaining < 0 ? COLORS.red : COLORS.amber, fontSize: 22 }}>{remaining >= 0 ? remaining : `+${Math.abs(remaining)}`}</div><div style={styles.dimLabel}>{remaining >= 0 ? "remaining" : "over"}</div></div>
+          </div>
+          <div style={styles.calorieMiniTrack}><div style={{ ...styles.calorieMiniFill, width: `${caloriePct * 100}%`, background: remaining < 0 ? COLORS.red : COLORS.amber }} /></div>
+        </div>
       </div>
       <div style={styles.macroRow}>
         <MacroStat label="Protein" value={totals.protein} target={targets.protein} color={COLORS.blue} />
@@ -1238,6 +1245,42 @@ function DailySummary({ totals, targets, remaining, onEditTargets }) {
       </div>
       <button style={styles.linkButton} onClick={onEditTargets}>Edit targets</button>
     </div>
+  );
+}
+function MacroCalorieRing({ calories, targetCalories, proteinKcal, carbsKcal, fatKcal }) {
+  const size = 118;
+  const center = size / 2;
+  const outerR = 49;
+  const innerR = 36;
+  const outerCirc = 2 * Math.PI * outerR;
+  const innerCirc = 2 * Math.PI * innerR;
+  const caloriePct = Math.min(Math.max((calories || 0) / (targetCalories || 1), 0), 1);
+  const macroTotal = Math.max(proteinKcal + carbsKcal + fatKcal, 0);
+  let offset = 0;
+  const segments = [
+    { value: proteinKcal, color: COLORS.blue },
+    { value: carbsKcal, color: COLORS.amber },
+    { value: fatKcal, color: COLORS.pink },
+  ].map((seg) => {
+    const pct = macroTotal > 0 ? seg.value / macroTotal : 0;
+    const item = { ...seg, pct, offset };
+    offset += pct;
+    return item;
+  });
+  return (
+    <svg viewBox={`0 0 ${size} ${size}`} style={styles.foodMacroRing} aria-hidden="true">
+      <circle cx={center} cy={center} r={outerR} fill="none" stroke={COLORS.cardBorder} strokeWidth="8" />
+      <circle cx={center} cy={center} r={outerR} fill="none" stroke={calories > targetCalories ? COLORS.red : COLORS.amber} strokeWidth="8" strokeLinecap="round"
+        strokeDasharray={`${outerCirc * caloriePct} ${outerCirc}`} transform={`rotate(-90 ${center} ${center})`} />
+      <circle cx={center} cy={center} r={innerR} fill="none" stroke={COLORS.cardBorder} strokeWidth="12" />
+      {segments.map((seg, i) => seg.pct > 0 ? (
+        <circle key={i} cx={center} cy={center} r={innerR} fill="none" stroke={seg.color} strokeWidth="12"
+          strokeDasharray={`${innerCirc * seg.pct} ${innerCirc}`} strokeDashoffset={-innerCirc * seg.offset}
+          transform={`rotate(-90 ${center} ${center})`} />
+      ) : null)}
+      <text x={center} y={center - 2} textAnchor="middle" fill={COLORS.text} fontSize="16" fontWeight="700" fontFamily={FONT_NUM}>{Math.round(caloriePct * 100)}%</text>
+      <text x={center} y={center + 13} textAnchor="middle" fill={COLORS.textDim} fontSize="10">cal</text>
+    </svg>
   );
 }
 function MacroStat({ label, value, target, color }) {
@@ -2285,6 +2328,10 @@ const styles = {
   tabularNum: { fontFamily: FONT_NUM, fontSize: 16, fontWeight: 500 },
   stackedBarTrack: { display: "flex", height: 8, borderRadius: 4, overflow: "hidden", background: "#2A2E33", margin: "14px 0" },
   stackedBarSeg: { height: "100%" },
+  foodSummaryTop: { display: "flex", alignItems: "center", gap: 14 },
+  foodMacroRing: { flex: "0 0 118px", width: 118, height: 118 },
+  calorieMiniTrack: { height: 6, borderRadius: 3, overflow: "hidden", background: COLORS.cardBorder, marginTop: 12 },
+  calorieMiniFill: { height: "100%", borderRadius: 3 },
   macroRow: { display: "flex", gap: 10 },
   linkButton: { background: "none", border: "none", color: COLORS.amber, fontSize: 13, padding: 0, marginTop: 6, cursor: "pointer", fontFamily: FONT_BODY, display: "inline-flex", alignItems: "center", gap: 4 },
   sectionHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" },
