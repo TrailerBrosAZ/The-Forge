@@ -642,6 +642,14 @@ function logKeyFor(plan, dayId, exName, wk) {
 function cardioLogKeyFor(plan, dayId, name, wk) {
   return logKeyFor(plan, dayId, `cardio:${name}`, wk);
 }
+function decorateSetsForExercise(ex, sets) {
+  if (exerciseType(ex) !== "strength") return sets;
+  return (sets || []).map((set) => ({
+    ...set,
+    targetReps: set.targetReps || ex.r || "",
+    targetRpe: set.targetRpe || ex.rpe || "",
+  }));
+}
 
 function ActivePlanRunner({ plan, workoutLogs, logExerciseSession, onChangePlan }) {
   const [view, setView] = useState("days");
@@ -726,7 +734,7 @@ function ActivePlanRunner({ plan, workoutLogs, logExerciseSession, onChangePlan 
             <GuidedWorkout
               plan={plan} day={day} wkNum={wkNum} exercises={day.ex} workoutLogs={workoutLogs}
               activeIndex={selEx} setActiveIndex={setSelEx}
-              onSaveExercise={(exercise, sets) => logExerciseSession(logKeyFor(plan, day.d, exercise.n, wkNum), sets)}
+              onSaveExercise={(exercise, sets) => logExerciseSession(logKeyFor(plan, day.d, exercise.n, wkNum), decorateSetsForExercise(exercise, sets))}
             />
             <QuickAddCardio onSave={(entry) => logExerciseSession(cardioLogKeyFor(plan, day.d, entry.name, wkNum), [{ type: "cardio", duration: entry.duration, intensity: entry.intensity, done: true }])} />
           </>
@@ -774,7 +782,7 @@ function ActivePlanRunner({ plan, workoutLogs, logExerciseSession, onChangePlan 
       plan={plan} day={day} ex={ex} wkNum={wkNum} isWeekly={isWeekly} week={week}
       log={workoutLogs[logKeyFor(plan, day.d, ex.n, wkNum)]}
       onBack={() => setView("exlist")}
-      onSave={(sets) => { logExerciseSession(logKeyFor(plan, day.d, ex.n, wkNum), sets); setView("exlist"); }}
+      onSave={(sets) => { logExerciseSession(logKeyFor(plan, day.d, ex.n, wkNum), decorateSetsForExercise(ex, sets)); setView("exlist"); }}
     />
   );
 }
@@ -791,6 +799,72 @@ function formatTimer(seconds) {
   const s = Math.max(0, seconds);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
+function parseTargetReps(reps) {
+  const text = String(reps || "").toLowerCase();
+  if (!text || text.includes("rpe only")) return null;
+  const nums = [...text.matchAll(/\d+(\.\d+)?/g)].map((m) => Number(m[0])).filter((n) => n > 0);
+  if (!nums.length) return null;
+  if (text.includes("-") && nums.length >= 2) return (nums[0] + nums[1]) / 2;
+  return nums[0];
+}
+function parseTargetRpe(rpe) {
+  const text = String(rpe || "").toLowerCase();
+  if (!text || text.includes("%")) return null;
+  const match = text.match(/rpe\s*(\d+(\.\d+)?)/) || text.match(/^(\d+(\.\d+)?)$/);
+  if (!match) return null;
+  const val = Number(match[1]);
+  return val >= 1 && val <= 10 ? val : null;
+}
+function inferWeightIncrement(exName) {
+  const name = String(exName || "").toLowerCase();
+  if (/\b(db|dumbbell)\b/.test(name) || name.includes("arnold")) return 2.5;
+  return 5;
+}
+function formatSuggestedWeight(weight) {
+  if (!Number.isFinite(weight) || weight <= 0) return "";
+  return Number.isInteger(weight) ? String(weight) : String(Math.round(weight * 10) / 10);
+}
+function roundSuggestedWeight(weight, exName) {
+  const inc = inferWeightIncrement(exName);
+  if (!Number.isFinite(weight) || weight <= 0) return "";
+  let rounded = Math.round(weight / inc) * inc;
+  if (inc === 2.5 && rounded > 30) rounded = Math.round(weight / 5) * 5;
+  return formatSuggestedWeight(Math.max(0, rounded));
+}
+function suggestExerciseWeight(ex, sessions, setIndex = 0) {
+  const targetReps = parseTargetReps(ex?.r);
+  if (!targetReps) return "";
+  const targetRpe = parseTargetRpe(ex?.rpe);
+  const prior = (sessions || []).filter((s) => s.date !== todayKey()).slice(-6);
+  const samples = [];
+  prior.forEach((session, sessionIndex) => {
+    (session.sets || []).forEach((set, idx) => {
+      if (set.type === "cardio") return;
+      const weight = Number(set.weight);
+      const reps = Number(set.reps);
+      if (!(weight > 0) || !(reps > 0)) return;
+      const e1rm = weight * (1 + reps / 30);
+      let estimated = e1rm / (1 + targetReps / 30);
+      const histRpe = parseTargetRpe(set.targetRpe || session.targetRpe);
+      if (targetRpe && histRpe) estimated *= 1 + (targetRpe - histRpe) * 0.025;
+      const recencyWeight = Math.pow(1.35, sessionIndex);
+      const setWeight = idx === setIndex ? 1.25 : 1;
+      samples.push({ estimated, weight: recencyWeight * setWeight });
+    });
+  });
+  if (!samples.length) return "";
+  const weighted = samples.reduce((sum, sample) => sum + sample.estimated * sample.weight, 0) / samples.reduce((sum, sample) => sum + sample.weight, 0);
+  return roundSuggestedWeight(weighted, ex?.n);
+}
+function initialStrengthSets(ex, sessions, todaySession) {
+  const targetSets = parseInt(ex?.ws) || 3;
+  if (todaySession) return todaySession.sets || [];
+  return Array.from({ length: targetSets }, (_, i) => ({
+    weight: suggestExerciseWeight(ex, sessions, i),
+    reps: ex?.r || "",
+    note: "",
+  }));
+}
 
 function GuidedWorkout({ plan, day, wkNum, exercises, workoutLogs, activeIndex, setActiveIndex, onSaveExercise }) {
   const ex = exercises[activeIndex] || exercises[0];
@@ -799,9 +873,8 @@ function GuidedWorkout({ plan, day, wkNum, exercises, workoutLogs, activeIndex, 
   const sessions = log?.sessions || [];
   const lastSession = sessions.filter((s) => s.date !== today).slice(-1)[0];
   const todaySession = sessions.find((s) => s.date === today);
-  const targetSets = parseInt(ex?.ws) || 3;
   const [setIndex, setSetIndex] = useState(0);
-  const [sets, setSets] = useState(() => todaySession?.sets || Array.from({ length: targetSets }, (_, i) => ({ weight: lastSession?.sets[i]?.weight || "", reps: lastSession?.sets[i]?.reps || ex?.r || "", note: "" })));
+  const [sets, setSets] = useState(() => initialStrengthSets(ex, sessions, todaySession));
   const [cardioDuration, setCardioDuration] = useState(todaySession?.sets?.[0]?.duration || ex?.duration || "");
   const [cardioIntensity, setCardioIntensity] = useState(todaySession?.sets?.[0]?.intensity || ex?.intensity || "");
   const [cardioError, setCardioError] = useState("");
@@ -811,11 +884,9 @@ function GuidedWorkout({ plan, day, wkNum, exercises, workoutLogs, activeIndex, 
     const nextLog = ex ? workoutLogs[logKeyFor(plan, day.d, ex.n, wkNum)] : null;
     const nextSessions = nextLog?.sessions || [];
     const nextToday = nextSessions.find((s) => s.date === today);
-    const nextLast = nextSessions.filter((s) => s.date !== today).slice(-1)[0];
-    const nextTarget = parseInt(ex?.ws) || 3;
     setSetIndex(0);
     setRestLeft(0);
-    setSets(nextToday?.sets || Array.from({ length: nextTarget }, (_, i) => ({ weight: nextLast?.sets[i]?.weight || "", reps: nextLast?.sets[i]?.reps || ex?.r || "", note: "" })));
+    setSets(initialStrengthSets(ex, nextSessions, nextToday));
     setCardioDuration(nextToday?.sets?.[0]?.duration || ex?.duration || "");
     setCardioIntensity(nextToday?.sets?.[0]?.intensity || ex?.intensity || "");
     setCardioError("");
@@ -1043,9 +1114,7 @@ function ExerciseLogger({ plan, day, ex, wkNum, isWeekly, week, log, onBack, onS
     if (!isNaN(w) && (pr === null || w > pr.weight)) pr = { weight: w, reps: st.reps, date: s.date };
   }));
 
-  const targetSets = parseInt(ex.ws) || 3;
-  const initSets = todaySession ? todaySession.sets
-    : Array.from({ length: targetSets }, (_, i) => ({ weight: lastSession?.sets[i]?.weight || "", reps: lastSession?.sets[i]?.reps || ex.r || "", note: "" }));
+  const initSets = initialStrengthSets(ex, sessions, todaySession);
 
   const [sets, setSets] = useState(initSets);
   const [showNotes, setShowNotes] = useState(false);
