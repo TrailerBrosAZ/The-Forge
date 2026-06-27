@@ -555,13 +555,20 @@ function PlanBuilder({ existing, createdBy, onCancel, onSave }) {
       )}
       <input style={styles.input} placeholder="Plan name (e.g. Anna's Upper/Lower)" value={name} onChange={(e) => setName(e.target.value)} />
 
-      {days.map((day, di) => (
-        <div key={di} style={styles.card}>
+      {days.map((day, di) => {
+        const strengthCount = day.ex.filter((e) => exerciseType(e) === "strength").length;
+        const cardioCount = day.ex.length - strengthCount;
+        return (
+        <div key={di} style={styles.builderDayCard}>
           <div style={styles.sectionHeader} onClick={() => setOpenDay(openDay === di ? -1 : di)}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
               {openDay === di ? <ChevronUp size={16} color={COLORS.textDim} /> : <ChevronDown size={16} color={COLORS.textDim} />}
-              <span style={styles.sectionTitle}>Day {di + 1}</span>
-              <span style={styles.dimLabel}>{day.ex.length} ex</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={styles.sectionTitle}>Day {di + 1}</div>
+                <div style={styles.builderDayMeta}>
+                  {day.focus ? titleCase(day.focus) : "No focus yet"} · {strengthCount} strength{cardioCount ? ` · ${cardioCount} cardio` : ""}
+                </div>
+              </div>
             </div>
             <button style={styles.iconButton} onClick={(e) => { e.stopPropagation(); removeDay(di); }}><Trash2 size={15} color={COLORS.textDim} /></button>
           </div>
@@ -572,11 +579,17 @@ function PlanBuilder({ existing, createdBy, onCancel, onSave }) {
                 const type = exerciseType(ex);
                 return (
                   <div key={ei} style={styles.exBuilderRow}>
+                    <div style={styles.builderExerciseTop}>
+                      <span style={{ ...styles.exerciseTypePill, ...(type === "cardio" ? styles.exerciseTypePillCardio : {}) }}>
+                        {type === "cardio" ? <Timer size={13} /> : <Dumbbell size={13} />}
+                        {type === "cardio" ? "Cardio" : "Strength"}
+                      </span>
+                      <button style={styles.iconButtonSmall} onClick={() => removeExercise(di, ei)}><X size={15} color={COLORS.textDim} /></button>
+                    </div>
                     <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                       <input style={{ ...styles.input, flex: 1 }} placeholder={type === "cardio" ? "Cardio name" : "Exercise name"} value={ex.n} onChange={(e) => updateExercise(di, ei, "n", e.target.value)} />
-                      <button style={styles.iconButton} onClick={() => removeExercise(di, ei)}><X size={16} color={COLORS.textDim} /></button>
                     </div>
-                    <div style={{ ...styles.modeSwitch, marginTop: 8, marginBottom: 0 }}>
+                    <div style={{ ...styles.builderTypeSwitch, marginTop: 8 }}>
                       {["strength", "cardio"].map((m) => (
                         <button key={m} style={{ ...styles.modeButton, ...(type === m ? styles.modeButtonActive : {}) }} onClick={() => setExerciseType(di, ei, m)}>
                           {m === "strength" ? "Strength" : "Cardio"}
@@ -617,13 +630,13 @@ function PlanBuilder({ existing, createdBy, onCancel, onSave }) {
                 );
               })}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
-                <button style={styles.secondaryButton} onClick={() => addExercise(di)}><Plus size={14} style={{ verticalAlign: "-2px" }} /> Exercise</button>
-                <button style={styles.secondaryButton} onClick={() => addCardio(di)}><Plus size={14} style={{ verticalAlign: "-2px" }} /> Cardio</button>
+                <button style={styles.secondaryButton} onClick={() => addExercise(di)}><Dumbbell size={14} style={{ verticalAlign: "-2px", marginRight: 5 }} />Exercise</button>
+                <button style={styles.secondaryButton} onClick={() => addCardio(di)}><Timer size={14} style={{ verticalAlign: "-2px", marginRight: 5 }} />Cardio</button>
               </div>
             </div>
           )}
         </div>
-      ))}
+      );})}
 
       <button style={styles.secondaryButton} onClick={addDay}><Plus size={15} style={{ verticalAlign: "-2px" }} /> Add day</button>
       <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
@@ -675,14 +688,22 @@ function ActivePlanRunner({ plan, workoutLogs, logExerciseSession, onChangePlan 
       return (log?.sessions || []).length > 0;
     }).length;
   }
+  const totalLogged = daysList.reduce((sum, d) => sum + dayLoggedCount(d), 0);
+  const totalExercises = daysList.reduce((sum, d) => sum + d.ex.length, 0);
 
   if (view === "days") {
     return (
       <div style={styles.tabContent}>
-        <div style={styles.screenHeader}>
+        <div style={styles.trainHero}>
           <div style={{ minWidth: 0 }}>
-            <div style={styles.screenTitle}>{plan.name}</div>
-            <button style={styles.linkButton} onClick={onChangePlan}><Library size={13} style={{ verticalAlign: "-2px" }} /> Change plan</button>
+            <div style={styles.trainHeroKicker}>Active plan</div>
+            <div style={styles.trainHeroTitle}>{plan.name}</div>
+            <div style={styles.trainHeroMeta}>{daysList.length} days / {totalExercises} exercises</div>
+          </div>
+          <button style={styles.iconCircleGhost} onClick={onChangePlan} aria-label="Change plan" title="Change plan"><Library size={18} color={COLORS.amber} /></button>
+          <div style={styles.trainHeroProgress}>
+            <span>{totalLogged}/{totalExercises || 0} logged</span>
+            <div style={styles.progressTrack}><div style={{ ...styles.progressFill, width: `${totalExercises ? Math.min(100, (totalLogged / totalExercises) * 100) : 0}%` }} /></div>
           </div>
         </div>
 
@@ -700,14 +721,16 @@ function ActivePlanRunner({ plan, workoutLogs, logExerciseSession, onChangePlan 
 
         {daysList.map((d, di) => {
           const done = dayLoggedCount(d);
+          const pct = d.ex.length ? Math.min(100, (done / d.ex.length) * 100) : 0;
           return (
             <button key={di} style={styles.dayCard} onClick={() => { setSelDay(di); setView("exlist"); }}>
               <div style={{ flex: 1, textAlign: "left" }}>
                 <div style={styles.dayCardTitle}>Day {d.d}</div>
                 <div style={styles.dayCardFocus}>{titleCase(d.focus)}</div>
+                <div style={{ ...styles.progressTrack, marginTop: 10 }}><div style={{ ...styles.progressFill, width: `${pct}%`, background: done === d.ex.length && d.ex.length ? COLORS.green : COLORS.amber }} /></div>
               </div>
               <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                <span style={styles.dimLabel}>{d.ex.length} exercises</span>
+                <span style={styles.dimLabel}>{d.ex.length} ex</span>
                 {done > 0 && <span style={{ ...styles.badge, background: done === d.ex.length ? COLORS.green : COLORS.cardBorder, color: done === d.ex.length ? COLORS.bg : COLORS.textDim }}>{done === d.ex.length ? "Done" : `${done}/${d.ex.length}`}</span>}
               </div>
               <ChevronRight size={18} color={COLORS.textDim} style={{ marginLeft: 8 }} />
@@ -719,13 +742,21 @@ function ActivePlanRunner({ plan, workoutLogs, logExerciseSession, onChangePlan 
   }
 
   if (view === "exlist") {
+    const dayDone = dayLoggedCount(day);
+    const strengthCount = day.ex.filter((item) => exerciseType(item) === "strength").length;
+    const cardioCount = day.ex.length - strengthCount;
     return (
       <div style={styles.tabContent}>
         <button style={styles.backRow} onClick={() => setView("days")}><ChevronLeft size={18} /> {isWeekly ? `Week ${week.wk}` : plan.name}</button>
         <div style={styles.screenHeader}><div><div style={styles.screenTitle}>Day {day.d}</div><div style={styles.dimLabel}>{titleCase(day.focus)}{isWeekly ? ` · Week ${week.wk}` : ""}</div></div></div>
-        <div style={styles.modeSwitch}>
-          {[["table", "Table"], ["guided", "Guided"]].map(([m, label]) => (
-            <button key={m} style={{ ...styles.modeButton, ...(runMode === m ? styles.modeButtonActive : {}) }} onClick={() => setRunMode(m)}>{label}</button>
+        <div style={styles.workoutMetaRow}>
+          <span>{dayDone}/{day.ex.length} logged</span>
+          <span>{strengthCount} strength</span>
+          {cardioCount > 0 && <span>{cardioCount} cardio</span>}
+        </div>
+        <div style={styles.compactModeSwitch}>
+          {[["table", "List"], ["guided", "Guided"]].map(([m, label]) => (
+            <button key={m} style={{ ...styles.compactModeButton, ...(runMode === m ? styles.compactModeButtonOn : {}) }} onClick={() => setRunMode(m)}>{label}</button>
           ))}
         </div>
         {runMode === "table" && day.ex.length === 0 && <QuickAddCardio onSave={(entry) => logExerciseSession(cardioLogKeyFor(plan, day.d, entry.name, wkNum), [{ type: "cardio", duration: entry.duration, intensity: entry.intensity, done: true }])} />}
@@ -749,7 +780,10 @@ function ActivePlanRunner({ plan, workoutLogs, logExerciseSession, onChangePlan 
               <React.Fragment key={ei}>
               <button style={styles.exCard} onClick={() => { setSelEx(ei); setView("logger"); }}>
                 <div style={{ flex: 1, textAlign: "left" }}>
-                  <div style={styles.exCardName}>{titleCase(e.n)}{loggedToday && <Check size={14} color={COLORS.green} style={{ marginLeft: 6, verticalAlign: "-2px" }} />}</div>
+                  <div style={styles.exCardTopLine}>
+                    <span style={styles.exCardName}>{titleCase(e.n)}{loggedToday && <Check size={14} color={COLORS.green} style={{ marginLeft: 6, verticalAlign: "-2px" }} />}</span>
+                    <span style={{ ...styles.exerciseTypePill, ...styles.exerciseTypePillCardio }}><Timer size={12} />Cardio</span>
+                  </div>
                   <div style={styles.exCardMeta}>{cardioSummary(e)}</div>
                   {last && <div style={styles.exLastLine}>last: {cardioSummary(last.sets?.[0] || {})}</div>}
                 </div>
@@ -763,7 +797,10 @@ function ActivePlanRunner({ plan, workoutLogs, logExerciseSession, onChangePlan 
             <React.Fragment key={ei}>
             <button style={styles.exCard} onClick={() => { setSelEx(ei); setView("logger"); }}>
               <div style={{ flex: 1, textAlign: "left" }}>
-                <div style={styles.exCardName}>{titleCase(e.n)}{loggedToday && <Check size={14} color={COLORS.green} style={{ marginLeft: 6, verticalAlign: "-2px" }} />}</div>
+                <div style={styles.exCardTopLine}>
+                  <span style={styles.exCardName}>{titleCase(e.n)}{loggedToday && <Check size={14} color={COLORS.green} style={{ marginLeft: 6, verticalAlign: "-2px" }} />}</span>
+                  <span style={styles.exerciseTypePill}><Dumbbell size={12} />Strength</span>
+                </div>
                 <div style={styles.exCardMeta}>{e.ws} × {e.r}{e.rpe ? ` @ ${e.rpe}` : ""}{e.rest ? ` · ${e.rest.toLowerCase()}` : ""}</div>
                 {last && <div style={styles.exLastLine}>last: {last.sets.map((s) => `${s.weight || "—"}×${s.reps || "—"}`).join("  ")}</div>}
               </div>
@@ -1027,8 +1064,14 @@ function QuickAddCardio({ onSave }) {
   }
 
   return (
-    <div style={styles.card}>
-      <div style={styles.cardHeader}>Quick Add Cardio</div>
+    <div style={styles.quickCardioCard}>
+      <div style={styles.quickCardioHeader}>
+        <div style={styles.quickCardioIcon}><Timer size={17} color={COLORS.amber} /></div>
+        <div>
+          <div style={styles.sectionTitle}>Quick Add Cardio</div>
+          <div style={styles.dimLabel}>Extra work</div>
+        </div>
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 92px", gap: 8 }}>
         <input style={styles.input} placeholder="Treadmill, StairMaster" value={name} onChange={(e) => { setName(e.target.value); setSaved(false); }} />
         <input style={{ ...styles.input, fontFamily: FONT_NUM, textAlign: "center" }} type="number" min="0" inputMode="decimal" placeholder="min" value={duration} onChange={(e) => { setDuration(e.target.value); setSaved(false); }} />
@@ -2436,18 +2479,38 @@ const styles = {
   planCard: { display: "flex", alignItems: "center", gap: 10, background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 12, padding: 14 },
   planName: { fontSize: 15, fontWeight: 600 },
   planMeta: { fontSize: 12, color: COLORS.textDim, marginTop: 2 },
+  builderDayCard: { background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 14, padding: 14 },
+  builderDayMeta: { fontSize: 12, color: COLORS.textDim, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  builderExerciseTop: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8 },
+  builderTypeSwitch: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 0 },
   exBuilderRow: { background: COLORS.bg, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 10, padding: 10, marginBottom: 8 },
+  exerciseTypePill: { display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0, color: COLORS.amber, background: "rgba(232, 163, 61, 0.11)", border: `1px solid rgba(232, 163, 61, 0.35)`, borderRadius: 999, padding: "3px 7px", fontSize: 11, fontWeight: 700, fontFamily: FONT_BODY },
+  exerciseTypePillCardio: { color: COLORS.blue, background: "rgba(91, 155, 213, 0.12)", borderColor: "rgba(91, 155, 213, 0.35)" },
   zonePicker: { display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 },
   zoneChip: { fontSize: 11, color: COLORS.textDim, background: "none", border: `1px solid ${COLORS.cardBorder}`, borderRadius: 6, padding: "3px 7px", cursor: "pointer", fontFamily: FONT_BODY },
   zoneChipOn: { color: COLORS.bg, background: COLORS.blue, borderColor: COLORS.blue },
   // train run
+  trainHero: { background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 14, padding: 14, display: "grid", gridTemplateColumns: "1fr 40px", gap: 10, alignItems: "start" },
+  trainHeroKicker: { fontSize: 11, color: COLORS.textDim, textTransform: "uppercase", letterSpacing: 0, fontWeight: 700, marginBottom: 2 },
+  trainHeroTitle: { fontSize: 21, lineHeight: 1.12, fontWeight: 800, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" },
+  trainHeroMeta: { fontSize: 12, color: COLORS.textDim, marginTop: 5 },
+  trainHeroProgress: { gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "82px 1fr", gap: 8, alignItems: "center", color: COLORS.textDim, fontSize: 12, fontWeight: 600 },
+  iconCircleGhost: { width: 38, height: 38, borderRadius: "50%", background: COLORS.bg, border: `1px solid ${COLORS.cardBorder}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
+  progressTrack: { height: 6, background: COLORS.bg, borderRadius: 999, overflow: "hidden", border: `1px solid ${COLORS.cardBorder}` },
+  progressFill: { height: "100%", background: COLORS.amber, borderRadius: 999 },
   weekPicker: { display: "flex", alignItems: "center", justifyContent: "space-between", background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 12, padding: "6px 8px" },
   weekLabel: { fontSize: 16, fontWeight: 600 },
   dayCard: { display: "flex", alignItems: "center", background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 12, padding: 14, cursor: "pointer", color: COLORS.text, fontFamily: FONT_BODY },
   dayCardTitle: { fontSize: 15, fontWeight: 600 },
   dayCardFocus: { fontSize: 13, color: COLORS.textDim, marginTop: 2 },
   badge: { fontSize: 11, fontWeight: 600, borderRadius: 6, padding: "2px 7px" },
+  workoutHeaderCard: { background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 14, padding: 14 },
+  workoutMetaRow: { display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8, color: COLORS.textDim, fontSize: 12 },
+  compactModeSwitch: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 10, padding: 3 },
+  compactModeButton: { height: 32, background: "transparent", border: "none", borderRadius: 7, color: COLORS.textDim, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT_BODY },
+  compactModeButtonOn: { background: COLORS.amber, color: COLORS.bg },
   exCard: { display: "flex", alignItems: "center", background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 12, padding: 14, cursor: "pointer", color: COLORS.text, fontFamily: FONT_BODY },
+  exCardTopLine: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 },
   exCardName: { fontSize: 15, fontWeight: 600 },
   exCardMeta: { fontSize: 13, color: COLORS.textDim, marginTop: 2, fontFamily: FONT_NUM },
   exLastLine: { fontSize: 12, color: COLORS.blue, marginTop: 4, fontFamily: FONT_NUM },
@@ -2463,6 +2526,9 @@ const styles = {
   setInput: { flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 8, padding: "10px 12px", color: COLORS.text, fontSize: 16, fontFamily: FONT_NUM, textAlign: "center", width: "100%" },
   noteInput: { width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 8, padding: "8px 12px", color: COLORS.text, fontSize: 13, fontFamily: FONT_BODY, marginBottom: 8 },
   histRow: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: `1px solid ${COLORS.cardBorder}` },
+  quickCardioCard: { background: "#171B20", border: `1px dashed ${COLORS.cardBorder}`, borderRadius: 14, padding: 14 },
+  quickCardioHeader: { display: "flex", alignItems: "center", gap: 10, marginBottom: 10 },
+  quickCardioIcon: { width: 34, height: 34, borderRadius: 9, background: "rgba(232, 163, 61, 0.1)", border: `1px solid rgba(232, 163, 61, 0.25)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
   guidedCard: { background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 14, padding: 16, display: "flex", flexDirection: "column", gap: 12 },
   guidedSetBox: { background: COLORS.bg, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 10, padding: 12 },
   restPanel: { background: "#211c13", border: `1px solid ${COLORS.amber}`, borderRadius: 10, padding: 12 },
