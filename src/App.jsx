@@ -298,26 +298,28 @@ function Main({ profile, profiles, setProfiles, plans, setPlans, onSwitchProfile
       <style>{globalCss}</style>
       <TopBar profile={profile} onSwitchProfile={onSwitchProfile} />
       <div style={styles.content}>
-        {tab === "home" && (
-          <Dashboard profile={profile} weights={weights} workoutLogs={workoutLogs} dayLog={dayLog}
-            plans={plans} targets={targets} totals={totals} onGoTrain={() => setTab("train")} />
-        )}
-        {tab === "train" && (
-          <TrainHome
-            profile={profile} plans={plans} setPlans={setPlans}
-            setActivePlan={setActivePlan} workoutLogs={workoutLogs} logExerciseSession={logExerciseSession}
-          />
-        )}
-        {tab === "body" && <BodyTab workoutLogs={workoutLogs} plans={plans} profile={profile} setProfiles={setProfiles}
-          weights={weights} addWeightEntry={addWeightEntry} saveGoalWeight={saveGoalWeight}
-          measurements={measurements} addMeasurementEntry={addMeasurementEntry} onGoTrain={() => setTab("train")} />}
-        {tab === "food" && (
-          <FoodTab totals={totals} targets={targets} setTargets={updateTargets} todaysEntries={todaysEntries}
-            dayLog={dayLog} copyPreviousDay={copyPreviousDay}
-            addEntry={addEntry} removeEntry={removeEntry} myFoods={myFoods} saveCustomFood={saveCustomFood}
-            servingPrefs={servingPrefs}
-            deleteFood={(id) => setMyFoods((prev) => prev.filter((f) => f.id !== id))} />
-        )}
+        <div key={tab} style={styles.tabScene}>
+          {tab === "home" && (
+            <Dashboard profile={profile} weights={weights} workoutLogs={workoutLogs} dayLog={dayLog}
+              plans={plans} targets={targets} totals={totals} onGoTrain={() => setTab("train")} />
+          )}
+          {tab === "train" && (
+            <TrainHome
+              profile={profile} plans={plans} setPlans={setPlans}
+              setActivePlan={setActivePlan} workoutLogs={workoutLogs} logExerciseSession={logExerciseSession}
+            />
+          )}
+          {tab === "body" && <BodyTab workoutLogs={workoutLogs} plans={plans} profile={profile} setProfiles={setProfiles}
+            weights={weights} addWeightEntry={addWeightEntry} saveGoalWeight={saveGoalWeight}
+            measurements={measurements} addMeasurementEntry={addMeasurementEntry} onGoTrain={() => setTab("train")} />}
+          {tab === "food" && (
+            <FoodTab totals={totals} targets={targets} setTargets={updateTargets} todaysEntries={todaysEntries}
+              dayLog={dayLog} copyPreviousDay={copyPreviousDay}
+              addEntry={addEntry} removeEntry={removeEntry} myFoods={myFoods} saveCustomFood={saveCustomFood}
+              servingPrefs={servingPrefs}
+              deleteFood={(id) => setMyFoods((prev) => prev.filter((f) => f.id !== id))} />
+          )}
+        </div>
       </div>
       <nav style={styles.tabBar}>
         <TabButton icon={LayoutDashboard} label="Home" active={tab === "home"} onClick={() => setTab("home")} />
@@ -376,7 +378,7 @@ function TopBar({ profile, onSwitchProfile }) {
 
 function TabButton({ icon: Icon, label, active, onClick }) {
   return (
-    <button onClick={onClick} style={{ ...styles.tabButton, color: active ? COLORS.amber : COLORS.textDim }}>
+    <button onClick={onClick} style={{ ...styles.tabButton, ...(active ? styles.tabButtonActive : {}), color: active ? COLORS.amber : COLORS.textDim }}>
       <Icon size={22} strokeWidth={active ? 2.4 : 1.8} />
       <span style={{ fontSize: 11, marginTop: 2, fontWeight: active ? 600 : 400 }}>{label}</span>
     </button>
@@ -2401,29 +2403,31 @@ function AnatomyBody({ gender, side, fill, intensity }) {
 }
 
 // ============ STYLE TOKENS ============
-const COLORS = { bg: "#15171A", card: "#1E2125", cardBorder: "#2A2E33", text: "#F2F0EB", textDim: "#8A8F98", amber: "#E8A33D", blue: "#5B9BD5", pink: "#D87BA8", red: "#E5604F", green: "#5FB87A" };
-const globalCss = `* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; } html { margin: 0; width: 100%; height: 100%; background: ${COLORS.bg}; overflow: hidden; overscroll-behavior: none; touch-action: pan-y; -webkit-text-size-adjust: 100%; } body { margin: 0; width: 100%; height: 100%; background: ${COLORS.bg}; overflow: hidden; overscroll-behavior: none; touch-action: pan-y; } #root { width: 100%; height: 100dvh; background: ${COLORS.bg}; overflow: hidden; } input, textarea, select { font-size: 16px; } input:focus, button:focus-visible, select:focus { outline: 2px solid ${COLORS.amber}; outline-offset: 1px; } input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; } @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }`;
+const COLORS = { bg: "#101214", bgLift: "#15191D", card: "#1B1F24", cardHi: "#232830", cardBorder: "#30363F", text: "#F4F1EA", textDim: "#9AA0A9", amber: "#E9A642", amberSoft: "rgba(233, 166, 66, 0.16)", blue: "#6FA8D8", pink: "#D87BA8", red: "#E5604F", green: "#64BD82" };
+const globalCss = `* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; } html { margin: 0; width: 100%; height: 100%; background: ${COLORS.bg}; overflow: hidden; overscroll-behavior: none; touch-action: pan-y; -webkit-text-size-adjust: 100%; } body { margin: 0; width: 100%; height: 100%; background: ${COLORS.bg}; overflow: hidden; overscroll-behavior: none; touch-action: pan-y; } #root { width: 100%; height: 100dvh; background: ${COLORS.bg}; overflow: hidden; } input, textarea, select { font-size: 16px; transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease; } input:focus, button:focus-visible, select:focus { outline: 2px solid ${COLORS.amber}; outline-offset: 1px; } input:focus, textarea:focus, select:focus { border-color: rgba(233,166,66,0.66) !important; box-shadow: 0 0 0 3px rgba(233,166,66,0.1); } button { transition: transform 150ms ease, background 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease, opacity 180ms ease; } button:active:not(:disabled) { transform: scale(0.975); } input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; } @keyframes tabSceneIn { from { opacity: 0; transform: translate3d(0, 10px, 0) scale(0.992); filter: blur(1px); } to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); } } @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }`;
 const FONT_BODY = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 const FONT_NUM = "'SF Mono', 'Roboto Mono', ui-monospace, monospace";
 
 const styles = {
-  app: { height: "100dvh", background: COLORS.bg, color: COLORS.text, fontFamily: FONT_BODY, display: "flex", flexDirection: "column", paddingTop: "env(safe-area-inset-top)", overflow: "hidden" },
+  app: { height: "100dvh", background: `linear-gradient(180deg, ${COLORS.bgLift} 0%, ${COLORS.bg} 46%, #0D0F11 100%)`, color: COLORS.text, fontFamily: FONT_BODY, display: "flex", flexDirection: "column", paddingTop: "env(safe-area-inset-top)", overflow: "hidden" },
   loadingScreen: { minHeight: "100vh", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center" },
   loadingText: { color: COLORS.textDim, fontFamily: FONT_BODY },
-  content: { flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch", overscrollBehaviorY: "contain", touchAction: "pan-y", paddingBottom: "calc(76px + env(safe-area-inset-bottom))" },
+  content: { flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch", overscrollBehaviorY: "contain", touchAction: "pan-y", paddingBottom: "calc(76px + env(safe-area-inset-bottom))", background: "linear-gradient(180deg, rgba(255,255,255,0.018), rgba(255,255,255,0) 22%)" },
+  tabScene: { animation: "tabSceneIn 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both" },
   tabContent: { padding: "12px 14px 16px", display: "flex", flexDirection: "column", gap: 12, maxWidth: 480, margin: "0 auto" },
-  tabBar: { position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: COLORS.card, borderTop: `1px solid ${COLORS.cardBorder}`, padding: "8px 0 calc(14px + env(safe-area-inset-bottom))", zIndex: 30 },
-  tabButton: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", background: "none", border: "none", cursor: "pointer", fontFamily: FONT_BODY },
+  tabBar: { position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: "linear-gradient(180deg, rgba(31,35,41,0.9), rgba(18,20,23,0.96))", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", borderTop: `1px solid rgba(255,255,255,0.08)`, boxShadow: "0 -14px 34px rgba(0,0,0,0.34)", padding: "8px 0 calc(14px + env(safe-area-inset-bottom))", zIndex: 30 },
+  tabButton: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", background: "none", border: "none", cursor: "pointer", fontFamily: FONT_BODY, borderRadius: 12, padding: "3px 0" },
+  tabButtonActive: { background: "linear-gradient(180deg, rgba(233,166,66,0.12), rgba(233,166,66,0.03))", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.055)" },
   // top bar + profile chip
   topBar: { display: "flex", alignItems: "center", padding: "10px 14px 4px", maxWidth: 480, margin: "0 auto", width: "100%" },
-  profileChip: { display: "flex", alignItems: "center", gap: 8, background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 999, padding: "5px 12px 5px 6px", cursor: "pointer", fontFamily: FONT_BODY },
+  profileChip: { display: "flex", alignItems: "center", gap: 8, background: `linear-gradient(180deg, ${COLORS.cardHi}, ${COLORS.card})`, border: `1px solid rgba(255,255,255,0.08)`, borderRadius: 999, padding: "5px 12px 5px 6px", cursor: "pointer", fontFamily: FONT_BODY, boxShadow: "0 8px 20px rgba(0,0,0,0.22)" },
   chipAvatar: { width: 26, height: 26, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.bg, fontWeight: 700, fontSize: 13 },
   chipName: { color: COLORS.text, fontSize: 14, fontWeight: 600 },
   // profile gate
   gateWrap: { flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: 24, maxWidth: 480, margin: "0 auto", width: "100%" },
   gateTitle: { fontSize: 26, fontWeight: 700, marginBottom: 24, textAlign: "center" },
   gateGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 },
-  profileTile: { background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 16, padding: 20, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, cursor: "pointer", fontFamily: FONT_BODY },
+  profileTile: { background: `linear-gradient(180deg, ${COLORS.cardHi}, ${COLORS.card})`, border: `1px solid rgba(255,255,255,0.08)`, borderRadius: 16, padding: 20, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, cursor: "pointer", fontFamily: FONT_BODY, boxShadow: "0 18px 36px rgba(0,0,0,0.24)" },
   profileTileAdd: { borderStyle: "dashed" },
   profileAvatar: { width: 56, height: 56, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.bg, fontWeight: 700, fontSize: 24 },
   profileName: { fontSize: 15, fontWeight: 600, color: COLORS.text },
@@ -2433,7 +2437,7 @@ const styles = {
   // screens
   screenHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 },
   screenTitle: { fontSize: 20, fontWeight: 700 },
-  card: { background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 14, padding: 16 },
+  card: { background: `linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012)), ${COLORS.card}`, border: `1px solid rgba(255,255,255,0.075)`, borderRadius: 14, padding: 16, boxShadow: "0 14px 34px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.045)" },
   cardHeader: { fontSize: 13, fontWeight: 600, color: COLORS.textDim, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 },
   bigNumber: { fontFamily: FONT_NUM, fontSize: 34, fontWeight: 600, lineHeight: 1.1 },
   dimLabel: { fontSize: 12, color: COLORS.textDim },
@@ -2459,57 +2463,57 @@ const styles = {
   warningBanner: { background: "#2a1f0a", border: "1px solid #4a3a14", color: "#E8A33D", fontSize: 12, lineHeight: 1.4, padding: "10px 12px", borderRadius: 8, marginBottom: 10 },
   fieldRow: { marginBottom: 10 },
   fieldLabel: { fontSize: 12, color: COLORS.textDim, display: "block", marginBottom: 4 },
-  input: { width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 8, padding: "10px 12px", color: COLORS.text, fontSize: 15, fontFamily: FONT_BODY },
-  miniInput: { width: "100%", minWidth: 0, background: COLORS.bg, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 7, padding: "8px 6px", color: COLORS.text, fontSize: 14, fontFamily: FONT_NUM, textAlign: "center" },
+  input: { width: "100%", background: "rgba(12,14,16,0.78)", border: `1px solid rgba(255,255,255,0.075)`, borderRadius: 8, padding: "10px 12px", color: COLORS.text, fontSize: 15, fontFamily: FONT_BODY, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.035)" },
+  miniInput: { width: "100%", minWidth: 0, background: "rgba(12,14,16,0.78)", border: `1px solid rgba(255,255,255,0.075)`, borderRadius: 7, padding: "8px 6px", color: COLORS.text, fontSize: 14, fontFamily: FONT_NUM, textAlign: "center", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.035)" },
   miniLabel: { fontSize: 11, color: COLORS.textDim, marginBottom: 4, marginTop: 8, textTransform: "uppercase", letterSpacing: "0.03em" },
-  primaryButton: { background: COLORS.amber, color: COLORS.bg, border: "none", borderRadius: 8, padding: "10px 16px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT_BODY },
-  primaryButtonSm: { background: COLORS.amber, color: COLORS.bg, border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: FONT_BODY, whiteSpace: "nowrap" },
+  primaryButton: { background: `linear-gradient(180deg, #F0B453, ${COLORS.amber})`, color: COLORS.bg, border: "none", borderRadius: 8, padding: "10px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT_BODY, boxShadow: "0 8px 18px rgba(233,166,66,0.2), inset 0 1px 0 rgba(255,255,255,0.28)" },
+  primaryButtonSm: { background: `linear-gradient(180deg, #F0B453, ${COLORS.amber})`, color: COLORS.bg, border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT_BODY, whiteSpace: "nowrap", boxShadow: "0 8px 18px rgba(233,166,66,0.18), inset 0 1px 0 rgba(255,255,255,0.28)" },
   activeBadgeBtn: { background: "none", color: COLORS.amber, border: `1px solid ${COLORS.amber}`, borderRadius: 8, padding: "8px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: FONT_BODY, whiteSpace: "nowrap" },
-  secondaryButton: { background: "none", color: COLORS.text, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 8, padding: "9px 14px", fontSize: 14, cursor: "pointer", fontFamily: FONT_BODY },
+  secondaryButton: { background: "linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.008))", color: COLORS.text, border: `1px solid rgba(255,255,255,0.085)`, borderRadius: 8, padding: "9px 14px", fontSize: 14, cursor: "pointer", fontFamily: FONT_BODY },
   modalOverlay: { position: "fixed", top: 0, left: 0, right: 0, bottom: "calc(74px + env(safe-area-inset-bottom))", background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-end", zIndex: 80 },
-  modalSheet: { background: COLORS.card, borderRadius: "16px 16px 0 0", padding: "18px 18px 22px", width: "100%", maxWidth: 480, margin: "0 auto", boxSizing: "border-box", maxHeight: "calc(100dvh - 108px - env(safe-area-inset-top) - env(safe-area-inset-bottom))", overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehaviorY: "contain", touchAction: "pan-y" },
+  modalSheet: { background: `linear-gradient(180deg, ${COLORS.cardHi}, ${COLORS.card})`, border: `1px solid rgba(255,255,255,0.08)`, borderBottom: "none", borderRadius: "16px 16px 0 0", padding: "18px 18px 22px", width: "100%", maxWidth: 480, margin: "0 auto", boxSizing: "border-box", maxHeight: "calc(100dvh - 108px - env(safe-area-inset-top) - env(safe-area-inset-bottom))", overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehaviorY: "contain", touchAction: "pan-y", boxShadow: "0 -18px 46px rgba(0,0,0,0.44), inset 0 1px 0 rgba(255,255,255,0.055)" },
   modalHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
   modalTitle: { fontSize: 16, fontWeight: 600 },
   modeSwitch: { display: "flex", gap: 6, marginBottom: 14 },
-  modeButton: { flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 8, padding: "8px 0", fontSize: 13, color: COLORS.textDim, cursor: "pointer", fontFamily: FONT_BODY },
-  modeButtonActive: { color: COLORS.bg, background: COLORS.amber, borderColor: COLORS.amber },
+  modeButton: { flex: 1, background: "rgba(12,14,16,0.66)", border: `1px solid rgba(255,255,255,0.075)`, borderRadius: 8, padding: "8px 0", fontSize: 13, color: COLORS.textDim, cursor: "pointer", fontFamily: FONT_BODY },
+  modeButtonActive: { color: COLORS.bg, background: `linear-gradient(180deg, #F0B453, ${COLORS.amber})`, borderColor: COLORS.amber, boxShadow: "0 8px 18px rgba(233,166,66,0.16), inset 0 1px 0 rgba(255,255,255,0.24)" },
   resultRow: { display: "flex", width: "100%", background: "none", border: "none", borderTop: `1px solid ${COLORS.cardBorder}`, padding: "10px 0", cursor: "pointer", textAlign: "left" },
   validHint: { display: "flex", alignItems: "center", gap: 6, fontSize: 13, marginTop: 8, lineHeight: 1.4 },
   // plan library / builder
-  planCard: { display: "flex", alignItems: "center", gap: 10, background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 12, padding: 14 },
+  planCard: { display: "flex", alignItems: "center", gap: 10, background: `linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)), ${COLORS.card}`, border: `1px solid rgba(255,255,255,0.075)`, borderRadius: 12, padding: 14, boxShadow: "0 12px 28px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.04)" },
   planName: { fontSize: 15, fontWeight: 600 },
   planMeta: { fontSize: 12, color: COLORS.textDim, marginTop: 2 },
-  builderDayCard: { background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 14, padding: 14 },
+  builderDayCard: { background: `linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012)), ${COLORS.card}`, border: `1px solid rgba(255,255,255,0.075)`, borderRadius: 14, padding: 14, boxShadow: "0 14px 34px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.045)" },
   builderDayMeta: { fontSize: 12, color: COLORS.textDim, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
   builderExerciseTop: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8 },
   builderTypeSwitch: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 0 },
-  exBuilderRow: { background: COLORS.bg, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 10, padding: 10, marginBottom: 8 },
+  exBuilderRow: { background: "rgba(12,14,16,0.68)", border: `1px solid rgba(255,255,255,0.075)`, borderRadius: 10, padding: 10, marginBottom: 8, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)" },
   exerciseTypePill: { display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0, color: COLORS.amber, background: "rgba(232, 163, 61, 0.11)", border: `1px solid rgba(232, 163, 61, 0.35)`, borderRadius: 999, padding: "3px 7px", fontSize: 11, fontWeight: 700, fontFamily: FONT_BODY },
   exerciseTypePillCardio: { color: COLORS.blue, background: "rgba(91, 155, 213, 0.12)", borderColor: "rgba(91, 155, 213, 0.35)" },
   zonePicker: { display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 },
   zoneChip: { fontSize: 11, color: COLORS.textDim, background: "none", border: `1px solid ${COLORS.cardBorder}`, borderRadius: 6, padding: "3px 7px", cursor: "pointer", fontFamily: FONT_BODY },
   zoneChipOn: { color: COLORS.bg, background: COLORS.blue, borderColor: COLORS.blue },
   // train run
-  trainHero: { background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 14, padding: 14, display: "grid", gridTemplateColumns: "1fr 40px", gap: 10, alignItems: "start" },
+  trainHero: { background: `linear-gradient(145deg, rgba(255,255,255,0.055), rgba(255,255,255,0.012)), ${COLORS.card}`, border: `1px solid rgba(255,255,255,0.085)`, borderRadius: 14, padding: 14, display: "grid", gridTemplateColumns: "1fr 40px", gap: 10, alignItems: "start", boxShadow: "0 16px 38px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06)" },
   trainHeroKicker: { fontSize: 11, color: COLORS.textDim, textTransform: "uppercase", letterSpacing: 0, fontWeight: 700, marginBottom: 2 },
   trainHeroTitle: { fontSize: 21, lineHeight: 1.12, fontWeight: 800, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" },
   trainHeroMeta: { fontSize: 12, color: COLORS.textDim, marginTop: 5 },
   trainHeroProgress: { gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "82px 1fr", gap: 8, alignItems: "center", color: COLORS.textDim, fontSize: 12, fontWeight: 600 },
-  iconCircleGhost: { width: 38, height: 38, borderRadius: "50%", background: COLORS.bg, border: `1px solid ${COLORS.cardBorder}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
+  iconCircleGhost: { width: 38, height: 38, borderRadius: "50%", background: "rgba(12,14,16,0.74)", border: `1px solid rgba(255,255,255,0.085)`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.045)" },
   progressTrack: { height: 6, background: COLORS.bg, borderRadius: 999, overflow: "hidden", border: `1px solid ${COLORS.cardBorder}` },
   progressFill: { height: "100%", background: COLORS.amber, borderRadius: 999 },
   weekPicker: { display: "flex", alignItems: "center", justifyContent: "space-between", background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 12, padding: "6px 8px" },
   weekLabel: { fontSize: 16, fontWeight: 600 },
-  dayCard: { display: "flex", alignItems: "center", background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 12, padding: 14, cursor: "pointer", color: COLORS.text, fontFamily: FONT_BODY },
+  dayCard: { display: "flex", alignItems: "center", background: `linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)), ${COLORS.card}`, border: `1px solid rgba(255,255,255,0.075)`, borderRadius: 12, padding: 14, cursor: "pointer", color: COLORS.text, fontFamily: FONT_BODY, boxShadow: "0 12px 28px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.04)" },
   dayCardTitle: { fontSize: 15, fontWeight: 600 },
   dayCardFocus: { fontSize: 13, color: COLORS.textDim, marginTop: 2 },
   badge: { fontSize: 11, fontWeight: 600, borderRadius: 6, padding: "2px 7px" },
-  workoutHeaderCard: { background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 14, padding: 14 },
+  workoutHeaderCard: { background: `linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012)), ${COLORS.card}`, border: `1px solid rgba(255,255,255,0.075)`, borderRadius: 14, padding: 14, boxShadow: "0 14px 34px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.045)" },
   workoutMetaRow: { display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8, color: COLORS.textDim, fontSize: 12 },
-  compactModeSwitch: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 10, padding: 3 },
+  compactModeSwitch: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, background: "rgba(12,14,16,0.68)", border: `1px solid rgba(255,255,255,0.075)`, borderRadius: 10, padding: 3, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)" },
   compactModeButton: { height: 32, background: "transparent", border: "none", borderRadius: 7, color: COLORS.textDim, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT_BODY },
-  compactModeButtonOn: { background: COLORS.amber, color: COLORS.bg },
-  exCard: { display: "flex", alignItems: "center", background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 12, padding: 14, cursor: "pointer", color: COLORS.text, fontFamily: FONT_BODY },
+  compactModeButtonOn: { background: `linear-gradient(180deg, #F0B453, ${COLORS.amber})`, color: COLORS.bg, boxShadow: "0 8px 18px rgba(233,166,66,0.15), inset 0 1px 0 rgba(255,255,255,0.24)" },
+  exCard: { display: "flex", alignItems: "center", background: `linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)), ${COLORS.card}`, border: `1px solid rgba(255,255,255,0.075)`, borderRadius: 12, padding: 14, cursor: "pointer", color: COLORS.text, fontFamily: FONT_BODY, boxShadow: "0 12px 28px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.04)" },
   exCardTopLine: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 },
   exCardName: { fontSize: 15, fontWeight: 600 },
   exCardMeta: { fontSize: 13, color: COLORS.textDim, marginTop: 2, fontFamily: FONT_NUM },
