@@ -1279,7 +1279,7 @@ function FoodTab({ totals, targets, setTargets, todaysEntries, dayLog, copyPrevi
         <MealSection key={sec.id} section={sec} items={todaysEntries[sec.id] || []} onAdd={() => setActiveAdd(sec.id)} onRemove={(id) => removeEntry(sec.id, id)} />
       ))}
       <NutritionHistory dayLog={dayLog} targets={targets} />
-      {activeAdd && <AddFoodModal sectionLabel={MEAL_SECTIONS.find((s) => s.id === activeAdd)?.label} myFoods={myFoods} recentFoods={recentFoods} deleteFood={deleteFood} servingPrefs={servingPrefs} onClose={() => setActiveAdd(null)} onAdd={(entry, save) => { addEntry(activeAdd, entry); if (save) saveCustomFood(entry); setActiveAdd(null); }} onSaveRecipe={(recipe) => { saveCustomFood(recipe); }} />}
+      {activeAdd && <AddFoodModal sectionLabel={MEAL_SECTIONS.find((s) => s.id === activeAdd)?.label} myFoods={myFoods} recentFoods={recentFoods} deleteFood={deleteFood} servingPrefs={servingPrefs} onClose={() => setActiveAdd(null)} onAdd={(entry, foodToSave) => { addEntry(activeAdd, entry); if (foodToSave) saveCustomFood(foodToSave); setActiveAdd(null); }} onSaveRecipe={(recipe) => { saveCustomFood(recipe); }} />}
     </div>
   );
 }
@@ -1478,10 +1478,43 @@ function AddFoodModal({ sectionLabel, myFoods, recentFoods, deleteFood, servingP
   const [selected, setSelected] = useState(null);
   const [servings, setServings] = useState(1);
   function selectFood(f) { setSelected(f); setServings(servingPrefs?.[foodKey(f)] || 1); }
+  function perServingValue(food, baseKey, totalKey) {
+    if (food[baseKey] != null) return food[baseKey];
+    if (food.servings > 0) return food[totalKey] / food.servings;
+    return food[totalKey];
+  }
   function confirmAdd(save) {
     if (!selected || !(servings > 0)) return;
-    onAdd({ name: selected.name, calories: selected.calories * servings, protein: selected.protein * servings, carbs: selected.carbs * servings, fat: selected.fat * servings, servings, foodKey: foodKey(selected) }, save);
+    const perServing = {
+      name: selected.name,
+      calories: perServingValue(selected, "baseCalories", "calories"),
+      protein: perServingValue(selected, "baseProtein", "protein"),
+      carbs: perServingValue(selected, "baseCarbs", "carbs"),
+      fat: perServingValue(selected, "baseFat", "fat"),
+      servingNote: selected.servingNote || "1 serving",
+      isRecipe: selected.isRecipe || false,
+    };
+    onAdd({
+      name: perServing.name,
+      calories: perServing.calories * servings,
+      protein: perServing.protein * servings,
+      carbs: perServing.carbs * servings,
+      fat: perServing.fat * servings,
+      baseCalories: perServing.calories,
+      baseProtein: perServing.protein,
+      baseCarbs: perServing.carbs,
+      baseFat: perServing.fat,
+      servingNote: perServing.servingNote,
+      servings,
+      foodKey: foodKey(selected),
+    }, save ? perServing : null);
   }
+  const selectedPerServing = selected ? {
+    calories: perServingValue(selected, "baseCalories", "calories"),
+    protein: perServingValue(selected, "baseProtein", "protein"),
+    carbs: perServingValue(selected, "baseCarbs", "carbs"),
+    fat: perServingValue(selected, "baseFat", "fat"),
+  } : null;
   return (
     <div style={styles.modalOverlay} onClick={onClose}>
       <div style={styles.modalSheet} onClick={(e) => e.stopPropagation()}>
@@ -1494,7 +1527,7 @@ function AddFoodModal({ sectionLabel, myFoods, recentFoods, deleteFood, servingP
               <label style={styles.fieldLabel}>Servings</label>
               <ServingStepper value={servings} onChange={setServings} />
             </div>
-            <div style={{ display: "flex", gap: 16, margin: "12px 0", fontSize: 13, color: COLORS.textDim }}><span>{Math.round(selected.calories * servings)} cal</span><span>P{Math.round(selected.protein * servings)}</span><span>C{Math.round(selected.carbs * servings)}</span><span>F{Math.round(selected.fat * servings)}</span></div>
+            <div style={{ display: "flex", gap: 16, margin: "12px 0", fontSize: 13, color: COLORS.textDim }}><span>{Math.round(selectedPerServing.calories * servings)} cal</span><span>P{Math.round(selectedPerServing.protein * servings)}</span><span>C{Math.round(selectedPerServing.carbs * servings)}</span><span>F{Math.round(selectedPerServing.fat * servings)}</span></div>
             {!(servings > 0) && <div style={{ ...styles.dimLabel, color: COLORS.amber, marginBottom: 8 }}>Enter a serving amount greater than 0.</div>}
             <div style={{ display: "flex", gap: 8 }}>
               <button style={{ ...styles.primaryButton, flex: 1, opacity: servings > 0 ? 1 : 0.5 }} disabled={!(servings > 0)} onClick={() => confirmAdd(false)}>Add to Today</button>
