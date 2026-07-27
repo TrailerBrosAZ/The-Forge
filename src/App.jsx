@@ -11,7 +11,7 @@ import {
   stableLogKey,
 } from "./lib/workoutLogic.js";
 import { useDeadlineTimer } from "./hooks/useDeadlineTimer.js";
-import { parseEvoltPdf } from "./lib/evoltPdf.js";
+import { parseEvoltPdf, PDF_READER_BUILD } from "./lib/evoltPdf.js";
 import { deleteScanDocument, getScanDocument, listScanDocuments, putScanDocument, restoreScanDocuments } from "./lib/scanStorage.js";
 import { displayMetricValue, EVOLT_METRICS, validateEvoltScan } from "./lib/evoltParser.js";
 
@@ -30,6 +30,7 @@ const BODY_VB = {"maleFront":"0 0 724 1448","maleBack":"724 0 724 1448","femaleF
 // against. saveJSON stays async-shaped only so call sites read naturally
 // inside useEffect; it resolves immediately either way.
 const STORAGE_KEY_PREFIX = "theforge:";
+const APP_RELEASE = "2026.07.27.3";
 function readLocal(key, fallback) {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY_PREFIX + key);
@@ -440,6 +441,7 @@ function TopBar({ profile, onSwitchProfile }) {
             </div>
             <input ref={fileRef} type="file" accept="application/json,.json" onChange={importBackup} hidden />
             {message && <div role="alert" style={{ ...styles.warningBanner, marginTop: 12, marginBottom: 0 }}>{message}</div>}
+            <div style={{ ...styles.dimLabel, textAlign: "center", marginTop: 14 }}>Build {APP_RELEASE} · Reader {PDF_READER_BUILD}</div>
           </div>
         </div>
       )}
@@ -2424,7 +2426,9 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
       }
       setScanReview({ ...scan, id: uid(), file });
     } catch (error) {
-      setScanImportError(error.message || "Could not read that Evolt PDF.");
+      const ios = navigator.userAgent.match(/OS (\d+)[_.](\d+)/);
+      const device = ios ? ` · iOS ${ios[1]}.${ios[2]}` : "";
+      setScanImportError(`${error.message || "Could not read that Evolt PDF."} (${PDF_READER_BUILD}${device})`);
     } finally {
       setScanImporting(false);
     }

@@ -1,5 +1,7 @@
 import { parseEvoltPageItems } from "./evoltParser.js";
 
+export const PDF_READER_BUILD = "PDF3";
+
 export async function parseEvoltPdf(file) {
   if (!file) throw new Error("Choose an Evolt PDF.");
   if (file.type && file.type !== "application/pdf" && !file.name?.toLowerCase().endsWith(".pdf")) {
@@ -13,7 +15,7 @@ export async function parseEvoltPdf(file) {
   ]);
   GlobalWorkerOptions.workerSrc = pdfWorker;
   const data = new Uint8Array(await file.arrayBuffer());
-  const document = await getDocument({ data }).promise;
+  const document = await getDocument({ data, isEvalSupported: false }).promise;
   if (document.numPages < 1) throw new Error("The PDF does not contain a readable page.");
   const page = await document.getPage(1);
   const content = await page.getTextContent();

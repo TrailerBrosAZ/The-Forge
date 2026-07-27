@@ -110,4 +110,34 @@ assert.equal(parsedScan.metrics.find((metric) => metric.code === "weight").origi
 assert.ok(Math.abs(parsedScan.metrics.find((metric) => metric.code === "weight").value - 90.7185) < 0.001);
 assert.equal(parsedScan.warnings.length, 0);
 
+// Exercise the Safari-compatible PDF bundle with modern APIs deliberately absent.
+Promise.withResolvers = undefined;
+URL.parse = undefined;
+Uint8Array.fromBase64 = undefined;
+const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+const objects = [
+  "<< /Type /Catalog /Pages 2 0 R >>",
+  "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+  "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+  "<< /Length 51 >>\nstream\nBT /F1 12 Tf 72 720 Td (Safari compatible) Tj ET\nendstream",
+  "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+];
+let minimalPdf = "%PDF-1.4\n";
+const offsets = [0];
+objects.forEach((object, index) => {
+  offsets.push(minimalPdf.length);
+  minimalPdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+});
+const xrefOffset = minimalPdf.length;
+minimalPdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+offsets.slice(1).forEach((offset) => { minimalPdf += `${String(offset).padStart(10, "0")} 00000 n \n`; });
+minimalPdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+const compatibilityDocument = await getDocument({
+  data: new TextEncoder().encode(minimalPdf),
+  isEvalSupported: false,
+  verbosity: 0,
+}).promise;
+const compatibilityText = await (await compatibilityDocument.getPage(1)).getTextContent();
+assert.equal(compatibilityText.items.some((item) => item.str === "Safari compatible"), true);
+
 console.log("Core workout and timer tests passed.");
