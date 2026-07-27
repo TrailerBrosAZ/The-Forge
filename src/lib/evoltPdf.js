@@ -6,8 +6,10 @@ export async function parseEvoltPdf(file) {
     throw new Error("Evolt imports currently require a PDF.");
   }
   const [{ GlobalWorkerOptions, getDocument }, { default: pdfWorker }] = await Promise.all([
-    import("pdfjs-dist"),
-    import("pdfjs-dist/build/pdf.worker.min.mjs?url"),
+    // PDF.js's default build targets only the newest Firefox/Chrome APIs.
+    // The legacy build includes the polyfills required by mobile Safari.
+    import("pdfjs-dist/legacy/build/pdf.mjs"),
+    import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url"),
   ]);
   GlobalWorkerOptions.workerSrc = pdfWorker;
   const data = new Uint8Array(await file.arrayBuffer());
