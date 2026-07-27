@@ -3,7 +3,9 @@ import {
   clonePlanForProfile,
   dayProgress,
   ensurePlanIds,
+  exerciseCompleteEver,
   findNextWorkout,
+  historicalDayProgress,
   legacyLogKey,
   resolveWorkoutLogIdentity,
   stableLogKey,
@@ -35,9 +37,12 @@ const logs = {
   [rowLegacyKey]: { sessions: [{ date, sets: [{ reps: "10", weight: "50" }] }] },
 };
 assert.deepEqual(dayProgress(logs, plan, 0, 0, date), { required: 2, completed: 2, complete: true, empty: false });
+assert.deepEqual(historicalDayProgress(logs, plan, 0, 0), { required: 2, completed: 2, complete: true, empty: false });
+assert.equal(exerciseCompleteEver(logs[squatKey], plan.weeks[0].days[0].ex[0]), true);
 assert.deepEqual(findNextWorkout(logs, plan, date), { weekIndex: 1, dayIndex: 0, exerciseIndex: 0, reason: "next" });
 
 const partial = { [squatKey]: logs[squatKey] };
+assert.deepEqual(historicalDayProgress(partial, plan, 0, 0), { required: 2, completed: 1, complete: false, empty: false });
 assert.deepEqual(findNextWorkout(partial, plan, date), { weekIndex: 0, dayIndex: 0, exerciseIndex: 1, reason: "partial" });
 assert.deepEqual(resolveWorkoutLogIdentity(squatKey, [plan]), {
   planId: "plan",

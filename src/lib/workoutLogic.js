@@ -112,6 +112,12 @@ export function exerciseCompleteOnDate(log, date, exercise) {
   return strengthSets.filter((set) => set?.done === true).length >= targetSets;
 }
 
+export function exerciseCompleteEver(log, exercise) {
+  return (log?.sessions || []).some((session) => (
+    exerciseCompleteOnDate(log, session.date, exercise)
+  ));
+}
+
 export function dayProgress(logs, plan, weekIndex, dayIndex, date) {
   const weeks = planWeeks(plan);
   const week = weeks[weekIndex];
@@ -122,6 +128,26 @@ export function dayProgress(logs, plan, weekIndex, dayIndex, date) {
     sum + (exerciseCompleteOnDate(
       logForExercise(logs, plan, week, day, exercise, weekIndex, dayIndex, exerciseIndex),
       date,
+      exercise,
+    ) ? 1 : 0)
+  ), 0);
+  return {
+    required,
+    completed,
+    complete: required > 0 && completed === required,
+    empty: required === 0,
+  };
+}
+
+export function historicalDayProgress(logs, plan, weekIndex, dayIndex) {
+  const weeks = planWeeks(plan);
+  const week = weeks[weekIndex];
+  const day = week?.days?.[dayIndex];
+  const exercises = (day?.ex || []).filter(Boolean);
+  const required = exercises.length;
+  const completed = exercises.reduce((sum, exercise, exerciseIndex) => (
+    sum + (exerciseCompleteEver(
+      logForExercise(logs, plan, week, day, exercise, weekIndex, dayIndex, exerciseIndex),
       exercise,
     ) ? 1 : 0)
   ), 0);

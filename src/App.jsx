@@ -3,8 +3,10 @@ import { Plus, Trash2, Dumbbell, UtensilsCrossed, Scale, ChevronDown, ChevronUp,
 import {
   clonePlanForProfile,
   ensurePlanIds,
+  exerciseCompleteEver,
   exerciseCompleteOnDate,
   findNextWorkout,
+  historicalDayProgress,
   logForExercise,
   planWeeks,
   resolveWorkoutLogIdentity,
@@ -30,7 +32,7 @@ const BODY_VB = {"maleFront":"0 0 724 1448","maleBack":"724 0 724 1448","femaleF
 // against. saveJSON stays async-shaped only so call sites read naturally
 // inside useEffect; it resolves immediately either way.
 const STORAGE_KEY_PREFIX = "theforge:";
-const APP_RELEASE = "2026.07.27.3";
+const APP_RELEASE = "2026.07.27.4";
 function readLocal(key, fallback) {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY_PREFIX + key);
@@ -857,14 +859,24 @@ function ActivePlanRunner({ plan, profileId, workoutLogs, logExerciseSession, on
   function exerciseKey(d, exercise, dayIndex, exerciseIndex) {
     return stableLogKey(plan, week, d, exercise, safeWeekIndex, dayIndex, exerciseIndex);
   }
-  function dayLoggedCount(d, dayIndex) {
+  function dayLoggedTodayCount(d, dayIndex) {
     return d.ex.filter((exercise, exerciseIndex) => exerciseCompleteOnDate(
       getExerciseLog(d, exercise, dayIndex, exerciseIndex),
       todayKey(),
       exercise,
     )).length;
   }
-  const totalLogged = daysList.reduce((sum, d, dayIndex) => sum + dayLoggedCount(d, dayIndex), 0);
+  function dayDisplayProgress(d, dayIndex) {
+    if (isWeekly) return historicalDayProgress(workoutLogs, plan, safeWeekIndex, dayIndex);
+    const completed = dayLoggedTodayCount(d, dayIndex);
+    return {
+      required: d.ex.length,
+      completed,
+      complete: d.ex.length > 0 && completed === d.ex.length,
+      empty: d.ex.length === 0,
+    };
+  }
+  const totalLogged = daysList.reduce((sum, d, dayIndex) => sum + dayDisplayProgress(d, dayIndex).completed, 0);
   const totalExercises = daysList.reduce((sum, d) => sum + d.ex.length, 0);
 
   if (view === "days") {
@@ -896,10 +908,11 @@ function ActivePlanRunner({ plan, profileId, workoutLogs, logExerciseSession, on
         )}
 
         {daysList.map((d, di) => {
-          const done = dayLoggedCount(d, di);
+          const progress = dayDisplayProgress(d, di);
+          const done = progress.completed;
           const pct = d.ex.length ? Math.min(100, (done / d.ex.length) * 100) : 0;
           return (
-            <button key={di} style={styles.dayCard} onClick={() => { setSelDay(di); setView("exlist"); }}>
+            <button key={di} style={{ ...styles.dayCard, ...(progress.complete ? styles.dayCardCompleted : {}) }} onClick={() => { setSelDay(di); setView("exlist"); }}>
               <div style={{ flex: 1, textAlign: "left" }}>
                 <div style={styles.dayCardTitle}>Day {d.d}</div>
                 <div style={styles.dayCardFocus}>{titleCase(d.focus)}</div>
@@ -907,7 +920,7 @@ function ActivePlanRunner({ plan, profileId, workoutLogs, logExerciseSession, on
               </div>
               <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                 <span style={styles.dimLabel}>{d.ex.length} ex</span>
-                {done > 0 && <span style={{ ...styles.badge, background: done === d.ex.length ? COLORS.green : COLORS.cardBorder, color: done === d.ex.length ? COLORS.bg : COLORS.textDim }}>{done === d.ex.length ? "Done" : `${done}/${d.ex.length}`}</span>}
+                {done > 0 && <span style={{ ...styles.badge, background: progress.complete ? COLORS.green : COLORS.cardBorder, color: progress.complete ? COLORS.bg : COLORS.textDim }}>{progress.complete ? "Done" : `${done}/${d.ex.length}`}</span>}
               </div>
               <ChevronRight size={18} color={COLORS.textDim} style={{ marginLeft: 8 }} />
             </button>
@@ -918,7 +931,9 @@ function ActivePlanRunner({ plan, profileId, workoutLogs, logExerciseSession, on
   }
 
   if (view === "exlist") {
-    const dayDone = dayLoggedCount(day, safeDayIndex);
+    const dayProgress = dayDisplayProgress(day, safeDayIndex);
+    const dayDone = dayProgress.completed;
+    const dayDoneToday = dayLoggedTodayCount(day, safeDayIndex);
     const strengthCount = day.ex.filter((item) => exerciseType(item) === "strength").length;
     const cardioCount = day.ex.length - strengthCount;
     return (
@@ -952,14 +967,15 @@ function ActivePlanRunner({ plan, profileId, workoutLogs, logExerciseSession, on
           const log = getExerciseLog(day, e, safeDayIndex, ei);
           const last = log?.sessions?.[log.sessions.length - 1];
           const loggedToday = exerciseCompleteOnDate(log, todayKey(), e);
+          const completedForDisplay = isWeekly ? exerciseCompleteEver(log, e) : loggedToday;
           const type = exerciseType(e);
           if (type === "cardio") {
             return (
               <React.Fragment key={ei}>
-              <button style={styles.exCard} onClick={() => { setSelEx(ei); setView("logger"); }}>
+              <button style={{ ...styles.exCard, ...(completedForDisplay ? styles.exCardCompleted : {}) }} onClick={() => { setSelEx(ei); setView("logger"); }}>
                 <div style={{ flex: 1, textAlign: "left" }}>
                   <div style={styles.exCardTopLine}>
-                    <span style={styles.exCardName}>{titleCase(e.n)}{loggedToday && <Check size={14} color={COLORS.green} style={{ marginLeft: 6, verticalAlign: "-2px" }} />}</span>
+                    <span style={styles.exCardName}>{titleCase(e.n)}{completedForDisplay && <Check size={14} color={COLORS.green} style={{ marginLeft: 6, verticalAlign: "-2px" }} />}</span>
                     <span style={{ ...styles.exerciseTypePill, ...styles.exerciseTypePillCardio }}><Timer size={12} />Cardio</span>
                   </div>
                   <div style={styles.exCardMeta}>{cardioSummary(e)}</div>
@@ -973,10 +989,10 @@ function ActivePlanRunner({ plan, profileId, workoutLogs, logExerciseSession, on
           }
           return (
             <React.Fragment key={ei}>
-            <button style={styles.exCard} onClick={() => { setSelEx(ei); setView("logger"); }}>
+            <button style={{ ...styles.exCard, ...(completedForDisplay ? styles.exCardCompleted : {}) }} onClick={() => { setSelEx(ei); setView("logger"); }}>
               <div style={{ flex: 1, textAlign: "left" }}>
                 <div style={styles.exCardTopLine}>
-                  <span style={styles.exCardName}>{titleCase(e.n)}{loggedToday && <Check size={14} color={COLORS.green} style={{ marginLeft: 6, verticalAlign: "-2px" }} />}</span>
+                  <span style={styles.exCardName}>{titleCase(e.n)}{completedForDisplay && <Check size={14} color={COLORS.green} style={{ marginLeft: 6, verticalAlign: "-2px" }} />}</span>
                   <span style={styles.exerciseTypePill}><Dumbbell size={12} />Strength</span>
                 </div>
                 <div style={styles.exCardMeta}>{e.ws} × {e.r}{e.rpe ? ` @ ${e.rpe}` : ""}{e.rest ? ` · ${e.rest.toLowerCase()}` : ""}</div>
@@ -988,7 +1004,7 @@ function ActivePlanRunner({ plan, profileId, workoutLogs, logExerciseSession, on
             </React.Fragment>
           );
         })}
-        {day.ex.length > 0 && dayDone === day.ex.length && !celebratedWorkouts.includes(completionId) && (
+        {day.ex.length > 0 && dayDoneToday === day.ex.length && !celebratedWorkouts.includes(completionId) && (
           <button style={{ ...styles.primaryButton, width: "100%" }} onClick={() => {
             setCelebratedWorkouts((prev) => [...new Set([...prev, completionId])]);
             setCompletedWorkout({
@@ -3106,6 +3122,7 @@ const styles = {
   weekPicker: { display: "flex", alignItems: "center", justifyContent: "space-between", background: COLORS.card, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 12, padding: "6px 8px" },
   weekLabel: { fontSize: 16, fontWeight: 600 },
   dayCard: { display: "flex", alignItems: "center", background: `linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)), ${COLORS.card}`, border: `1px solid rgba(255,255,255,0.075)`, borderRadius: 12, padding: 14, cursor: "pointer", color: COLORS.text, fontFamily: FONT_BODY, boxShadow: "0 12px 28px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.04)" },
+  dayCardCompleted: { background: "linear-gradient(180deg, rgba(100,189,130,0.18), rgba(100,189,130,0.07)), #18221D", borderColor: "rgba(100,189,130,0.55)" },
   dayCardTitle: { fontSize: 15, fontWeight: 600 },
   dayCardFocus: { fontSize: 13, color: COLORS.textDim, marginTop: 2 },
   badge: { fontSize: 11, fontWeight: 600, borderRadius: 6, padding: "2px 7px" },
@@ -3115,6 +3132,7 @@ const styles = {
   compactModeButton: { height: 32, background: "transparent", border: "none", borderRadius: 7, color: COLORS.textDim, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT_BODY },
   compactModeButtonOn: { background: `linear-gradient(180deg, #F0B453, ${COLORS.amber})`, color: COLORS.bg, boxShadow: "0 8px 18px rgba(233,166,66,0.15), inset 0 1px 0 rgba(255,255,255,0.24)" },
   exCard: { display: "flex", alignItems: "center", background: `linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)), ${COLORS.card}`, border: `1px solid rgba(255,255,255,0.075)`, borderRadius: 12, padding: 14, cursor: "pointer", color: COLORS.text, fontFamily: FONT_BODY, boxShadow: "0 12px 28px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.04)" },
+  exCardCompleted: { background: "linear-gradient(180deg, rgba(100,189,130,0.16), rgba(100,189,130,0.06)), #18221D", borderColor: "rgba(100,189,130,0.5)" },
   exCardTopLine: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 },
   exCardName: { fontSize: 15, fontWeight: 600 },
   exCardMeta: { fontSize: 13, color: COLORS.textDim, marginTop: 2, fontFamily: FONT_NUM },
