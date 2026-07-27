@@ -1750,7 +1750,7 @@ function AddFoodModal({ sectionLabel, myFoods, recentFoods, deleteFood, servingP
             {mode === "recent" && (
               <div style={{ maxHeight: 320, overflowY: "auto" }}>
                 {recentFoods.length === 0 && <div style={styles.emptyHint}>Foods you log will appear here for quick reuse.</div>}
-                {recentFoods.map((food, index) => <button key={`${food.name}-${index}`} style={styles.resultRow} onClick={() => selectFood(food)}><div style={{ textAlign: "left" }}><div style={styles.foodName}>{food.name}</div><div style={styles.foodMacros}>{Math.round(food.calories)} cal Â· P{Math.round(food.protein)} C{Math.round(food.carbs)} F{Math.round(food.fat)}</div></div></button>)}
+                {recentFoods.map((food, index) => <button key={`${food.name}-${index}`} style={styles.resultRow} onClick={() => selectFood(food)}><div style={{ textAlign: "left" }}><div style={styles.foodName}>{food.name}</div><div style={styles.foodMacros}>{Math.round(food.calories)} cal · P{Math.round(food.protein)} C{Math.round(food.carbs)} F{Math.round(food.fat)}</div></div></button>)}
               </div>
             )}
             {mode === "myfoods" && (
