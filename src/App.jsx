@@ -1,5 +1,19 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Plus, Trash2, Dumbbell, UtensilsCrossed, Scale, ChevronDown, ChevronUp, X, ChevronLeft, ChevronRight, Trophy, History, Check, Library, Pencil, ArrowLeft, LayoutDashboard, PersonStanding, Settings, Download, Upload, Timer, Copy } from "lucide-react";
+import {
+  clonePlanForProfile,
+  ensurePlanIds,
+  exerciseCompleteOnDate,
+  findNextWorkout,
+  logForExercise,
+  planWeeks,
+  resolveWorkoutLogIdentity,
+  stableLogKey,
+} from "./lib/workoutLogic.js";
+import { useDeadlineTimer } from "./hooks/useDeadlineTimer.js";
+import { parseEvoltPdf } from "./lib/evoltPdf.js";
+import { deleteScanDocument, getScanDocument, listScanDocuments, putScanDocument, restoreScanDocuments } from "./lib/scanStorage.js";
+import { displayMetricValue, EVOLT_METRICS, validateEvoltScan } from "./lib/evoltParser.js";
 
 // ---- Embedded plan library + muscle map ----
 const ASSETS = {"BUILTIN_PLANS":[{"id":"builtin-nippard","name":"Jeff Nippard High Frequency Full Body","createdBy":"builtin","builtin":true,"structure":"weeks","weeks":[{"wk":1,"blk":1,"days":[{"d":1,"focus":"LOWER FOCUSED FULL BODY","ex":[{"n":"BACK SQUAT","ws":"4","r":"4","rpe":"77.5%","rest":"2-4 MIN","note":"SIT BACK AND DOWN, 15° TOE FLARE, DRIVE YOUR KNEES OUT LATERALLY","mz":{"quads":1,"glutes":1,"hamstrings":0.5}},{"n":"DUMBBELL INCLINE PRESS","ws":"3","r":"8","rpe":"RPE8","rest":"2-3 MIN","note":"~45 DEGREE INCLINE, MIND MUSCLE CONNECTION WITH UPPER PECS","mz":{"chest":1,"shoulders":0.5,"triceps":0.5}},{"n":"LYING LEG CURL","ws":"3","r":"10","rpe":"RPE6","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR HAMSTRINGS TO MOVE THE WEIGHT","mz":{"hamstrings":1}},{"n":"PRONATED PULLDOWN","ws":"3","r":"10","rpe":"RPE7","rest":"2-3 MIN","note":"PULL YOUR ELBOWS DOWN AND IN","mz":{"back":1,"biceps":0.5}},{"n":"SUPINATED EZ BAR CURL","ws":"3","r":"15/15","rpe":"RPE9","rest":"1-2 MIN","note":"DROPSET. DROP WEIGHT BY ~50% ON SECOND 15 REPS. 30 REPS TOTAL.","mz":{"biceps":1}},{"n":"HANGING LEG RAISE","ws":"3","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"ROLL HIPS \"UP\" AS YOU SQUEEZE LOWER ABS, AVOID SWINGING","mz":{"abs":1}}]},{"d":2,"focus":"CHEST FOCUSED FULL BODY","ex":[{"n":"BARBELL BENCH PRESS","ws":"3","r":"3","rpe":"85%","rest":"2-4 MIN","note":"SET UP A COMFORTABLE ARCH, 1-2 SECOND PAUSE ON CHEST, EXPLODE OFF CHEST WITH MAX FORCE","mz":{"chest":1,"triceps":0.5,"shoulders":0.5}},{"n":"LOW TO HIGH CABLE FLYE","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"START WITH YOUR HANDS OUT TO YOUR SIDES AND PALMS FACING THE CEILING, FOCUS ON PULLING YOUR ELBOWS UP AND IN WHILE ROTATING YOUR PALMS TO FACE THE FLOOR","mz":{"chest":1}},{"n":"BARBELL HIP THRUST OR ROMANIAN DEADLIFT","ws":"3","r":"12","rpe":"RPE6","rest":"2-3 MIN","note":"HIP THRUST IF GLUTES ARE PRIORITY, RDL IF HAMSTRINGS ARE PRIORITY FOR YOU. FOCUS ON MIND MUSCLE CONNECTION.","mz":{"glutes":1,"hamstrings":1}},{"n":"CHEST-SUPPORTED T-BAR ROW","ws":"3","r":"15","rpe":"RPE6","rest":"1-3 MIN","note":"SQUEEZE YOUR SHOULDER BLADES TOGETHER AT THE TOP, LET THEM ROUND FORWARD AT THE BOTTOM","mz":{"back":1,"biceps":0.5}},{"n":"ARNOLD PRESS","ws":"3","r":"10","rpe":"RPE7","rest":"1-3 MIN","note":"START WITH YOUR ELBOWS IN FRONT OF YOU AND PALMS FACING IN. ROTATE THE DUMBBELLS SO THAT YOUR PALMS FACE FORWARD AS YOU PRESS.","mz":{"shoulders":1,"triceps":0.5}},{"n":"TRICEP PRESSDOWN","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR TRICEPS TO MOVE THE WEIGHT","mz":{"triceps":1}},{"n":"HEX BAR OR SMITH MACHINE SHRUG","ws":"3","r":"12","rpe":"RPE6","rest":"1-2 MIN","note":"SHRUG UP AND IN, PULL SHOULDERS UP TO EARS!","mz":{"back":1,"shoulders":0.5}}]},{"d":3,"focus":"BACK FOCUSED FULL BODY","ex":[{"n":"WEIGHTED PULL-UP","ws":"3","r":"6","rpe":"RPE8","rest":"2-3 MIN","note":"1.5X SHOULDER WIDTH GRIP, PULL YOUR CHEST TO THE BAR","mz":{"back":1,"biceps":1}},{"n":"HUMBLE ROW","ws":"3","r":"10","rpe":"RPE8","rest":"2-3 MIN","note":"PIN YOUR LOWER CHEST AGAINST THE TOP OF AN INCLINE BENCH: https://www.instagram.com/p/B5GeRJoBAc1/","mz":{"back":1,"biceps":0.5}},{"n":"LEG PRESS","ws":"3","r":"15","rpe":"RPE6","rest":"2-3 MIN","note":"LOW/MEDIUM/HIGH FOOT PLACEMENT, DON'T ALLOW YOUR LOWER BACK TO ROUND","mz":{"quads":1,"glutes":0.5}},{"n":"STANDING CALF RAISE","ws":"4","r":"8","rpe":"RPE7","rest":"1-2 MIN","note":"1-2 SECOND PAUSE AT THE BOTTOM OF EACH REP","mz":{"calves":1}},{"n":"CABLE ROPE UPRIGHT ROW","ws":"3","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING THE UPPER TRAPS AT THE TOP","mz":{"shoulders":1,"back":0.5}},{"n":"HAMMER CURL","ws":"3","r":"8","rpe":"RPE9","rest":"1-2 MIN","note":"3-SECOND ECCENTRIC. ARC THE DUMBBELL \"OUT\" NOT \"UP\", FOCUS ON SQUEEZING YOUR FOREARMS","mz":{"biceps":1,"forearms":1}}]},{"d":4,"focus":"LOWER FOCUSED FULL BODY 2","ex":[{"n":"DEADLIFT","ws":"4","r":"2","rpe":"85%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1,"hamstrings":1,"glutes":1}},{"n":"DIP","ws":"3","r":"10","rpe":"RPE8","rest":"2-3 MIN","note":"TUCK YOUR ELBOWS AT 45°, LEAN YOUR TORSO FORWARD 15°, SHOULDER WIDTH OR SLIGHTLY WIDER GRIP.","mz":{"chest":1,"triceps":1}},{"n":"GLUTE HAM RAISE","ws":"3","r":"10","rpe":"RPE6","rest":"1-2 MIN","note":"KEEP LOWER BACK STRAIGHT, USE HAMSTRINGS TO CURL YOUR BODY UP","mz":{"hamstrings":1,"glutes":0.5}},{"n":"LEG EXTENSION","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR QUADS TO MOVE THE WEIGHT","mz":{"quads":1}},{"n":"CABLE PULL-OVER","ws":"3","r":"15","rpe":"RPE7","rest":"1-3 MIN","note":"LEAN YOUR TORSO AT A 45° ANGLE, FOCUS ON PULLING THE WEIGHT STRAIGHT DOWN, NOT \"IN\"","mz":{"back":1,"chest":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"RAISE THE DUMBBELL \"OUT\" NOT \"UP\", MIND MUSCLE CONNECTION WITH MIDDLE FIBERS","mz":{"shoulders":1}},{"n":"ROPE FACE PULL","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"PULL YOUR ELBOWS UP AND OUT, SQUEEZE YOUR SHOULDER BLADES TOGETHER","mz":{"shoulders":1,"back":0.5}},{"n":"EZ BAR SKULL CRUSHER","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"ARC THE BAR BACK BEHIND YOUR HEAD, KEEP CONSTANT TENSION ON TRICEPS","mz":{"triceps":1}}]},{"d":5,"focus":"DELTOID FOCUSED FULL BODY","ex":[{"n":"OVERHEAD PRESS","ws":"4","r":"6","rpe":"75%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1,"triceps":0.5}},{"n":"EGYPTIAN LATERAL RAISE","ws":"3","r":"8","rpe":"RPE8","rest":"1-2 MIN","note":"2-SECOND ECCENTRIC. LEAN AWAY FROM THE CABLE, FOCUS ON SQUEEZING YOUR DELTS","mz":{"shoulders":1}},{"n":"CABLE SEATED ROW","ws":"3","r":"12","rpe":"RPE7","rest":"1-3 MIN","note":"FOCUS ON SQUEEZING YOUR SHOULDER BLADES TOGETHER, PULL WITH YOUR ELBOWS DOWN AND IN","mz":{"back":1,"biceps":0.5}},{"n":"SEATED HIP ABDUCTION","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON DRIVING YOUR KNEES OUT","mz":{"glutes":1}},{"n":"INCLINE DUMBBELL CURL","ws":"2","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"BRACE UPPER BACK AGAINST BENCH, 45 DEGREE INCLINE, KEEP SHOULDERS BACK AS YOU CURL","mz":{"biceps":1}},{"n":"BICYCLE CRUNCH","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON FLEXING AND ROTATING YOUR SPINE, BRING YOUR LEFT ELBOW TO RIGHT KNEE, RIGHT ELBOW TO LEFT KNEE","mz":{"abs":1}},{"n":"STANDING CALF RAISE","ws":"4","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"PRESS ONTO YOUR TOES","mz":{"calves":1}},{"n":"PUSH UP","ws":"2","r":"RPE ONLY","rpe":"RPE6","rest":"1-2 MIN","note":"PERFORM AS MANY REPS AS YOU CAN TO HIT TARGET RPE","mz":{"chest":1,"triceps":0.5}}]}]},{"wk":2,"blk":1,"days":[{"d":1,"focus":"LOWER FOCUSED FULL BODY","ex":[{"n":"BACK SQUAT","ws":"3","r":"6","rpe":"77.5%","rest":"2-4 MIN","note":"SIT BACK AND DOWN, 15° TOE FLARE, DRIVE YOUR KNEES OUT LATERALLY","mz":{"quads":1,"glutes":1,"hamstrings":0.5}},{"n":"DUMBBELL INCLINE PRESS","ws":"3","r":"8","rpe":"RPE8","rest":"2-3 MIN","note":"~45 DEGREE INCLINE, MIND MUSCLE CONNECTION WITH UPPER PECS","mz":{"chest":1,"shoulders":0.5,"triceps":0.5}},{"n":"LYING LEG CURL","ws":"3","r":"10","rpe":"RPE6","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR HAMSTRINGS TO MOVE THE WEIGHT","mz":{"hamstrings":1}},{"n":"PRONATED PULLDOWN","ws":"3","r":"10","rpe":"RPE7","rest":"2-3 MIN","note":"PULL YOUR ELBOWS DOWN AND IN","mz":{"back":1,"biceps":0.5}},{"n":"SUPINATED EZ BAR CURL","ws":"3","r":"15/15","rpe":"RPE9","rest":"1-2 MIN","note":"DROPSET. DROP WEIGHT BY ~50% ON SECOND 15 REPS. 30 REPS TOTAL.","mz":{"biceps":1}},{"n":"HANGING LEG RAISE","ws":"3","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"ROLL HIPS \"UP\" AS YOU SQUEEZE LOWER ABS, AVOID SWINGING","mz":{"abs":1}}]},{"d":2,"focus":"CHEST FOCUSED FULL BODY","ex":[{"n":"BARBELL BENCH PRESS","ws":"3","r":"5","rpe":"80%","rest":"2-4 MIN","note":"SET UP A COMFORTABLE ARCH, 1-2 SECOND PAUSE ON CHEST, EXPLODE OFF CHEST WITH MAX FORCE","mz":{"chest":1,"triceps":0.5,"shoulders":0.5}},{"n":"LOW TO HIGH CABLE FLYE","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"START WITH YOUR HANDS OUT TO YOUR SIDES AND PALMS FACING THE CEILING, FOCUS ON PULLING YOUR ELBOWS UP AND IN WHILE ROTATING YOUR PALMS TO FACE THE FLOOR","mz":{"chest":1}},{"n":"BARBELL HIP THRUST OR ROMANIAN DEADLIFT","ws":"3","r":"12","rpe":"RPE6","rest":"2-3 MIN","note":"HIP THRUST IF GLUTES ARE PRIORITY, RDL IF HAMSTRINGS ARE PRIORITY FOR YOU. FOCUS ON MIND MUSCLE CONNECTION.","mz":{"glutes":1,"hamstrings":1}},{"n":"CHEST-SUPPORTED T-BAR ROW","ws":"3","r":"15","rpe":"RPE6","rest":"1-3 MIN","note":"SQUEEZE YOUR SHOULDER BLADES TOGETHER AT THE TOP, LET THEM ROUND FORWARD AT THE BOTTOM","mz":{"back":1,"biceps":0.5}},{"n":"ARNOLD PRESS","ws":"3","r":"10","rpe":"RPE7","rest":"1-3 MIN","note":"START WITH YOUR ELBOWS IN FRONT OF YOU AND PALMS FACING IN. ROTATE THE DUMBBELLS SO THAT YOUR PALMS FACE FORWARD AS YOU PRESS.","mz":{"shoulders":1,"triceps":0.5}},{"n":"TRICEP PRESSDOWN","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR TRICEPS TO MOVE THE WEIGHT","mz":{"triceps":1}},{"n":"HEX BAR OR SMITH MACHINE SHRUG","ws":"3","r":"12","rpe":"RPE6","rest":"1-2 MIN","note":"SHRUG UP AND IN, PULL SHOULDERS UP TO EARS!","mz":{"back":1,"shoulders":0.5}}]},{"d":3,"focus":"BACK FOCUSED FULL BODY","ex":[{"n":"WEIGHTED PULL-UP","ws":"3","r":"6","rpe":"RPE9","rest":"2-3 MIN","note":"1.5X SHOULDER WIDTH GRIP, PULL YOUR CHEST TO THE BAR","mz":{"back":1,"biceps":1}},{"n":"HUMBLE ROW","ws":"3","r":"10","rpe":"RPE8","rest":"2-3 MIN","note":"PIN YOUR LOWER CHEST AGAINST THE TOP OF AN INCLINE BENCH: https://www.instagram.com/p/B5GeRJoBAc1/","mz":{"back":1,"biceps":0.5}},{"n":"LEG PRESS","ws":"3","r":"15","rpe":"RPE6","rest":"2-3 MIN","note":"LOW/MEDIUM/HIGH FOOT PLACEMENT, DON'T ALLOW YOUR LOWER BACK TO ROUND","mz":{"quads":1,"glutes":0.5}},{"n":"STANDING CALF RAISE","ws":"4","r":"8","rpe":"RPE7","rest":"1-2 MIN","note":"1-2 SECOND PAUSE AT THE BOTTOM OF EACH REP","mz":{"calves":1}},{"n":"CABLE ROPE UPRIGHT ROW","ws":"3","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING THE UPPER TRAPS AT THE TOP","mz":{"shoulders":1,"back":0.5}},{"n":"HAMMER CURL","ws":"3","r":"8","rpe":"RPE9","rest":"1-2 MIN","note":"3-SECOND ECCENTRIC. ARC THE DUMBBELL \"OUT\" NOT \"UP\", FOCUS ON SQUEEZING YOUR FOREARMS","mz":{"biceps":1,"forearms":1}}]},{"d":4,"focus":"LOWER FOCUSED FULL BODY 2","ex":[{"n":"RESET DEADLIFT","ws":"3","r":"5","rpe":"80%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1,"hamstrings":1,"glutes":1}},{"n":"DIP","ws":"3","r":"10","rpe":"RPE8","rest":"2-3 MIN","note":"TUCK YOUR ELBOWS AT 45°, LEAN YOUR TORSO FORWARD 15°, SHOULDER WIDTH OR SLIGHTLY WIDER GRIP.","mz":{"chest":1,"triceps":1}},{"n":"GLUTE HAM RAISE","ws":"3","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"KEEP LOWER BACK STRAIGHT, USE HAMSTRINGS TO CURL YOUR BODY UP","mz":{"hamstrings":1,"glutes":0.5}},{"n":"LEG EXTENSION","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR QUADS TO MOVE THE WEIGHT","mz":{"quads":1}},{"n":"CABLE PULL-OVER","ws":"3","r":"15","rpe":"RPE7","rest":"1-3 MIN","note":"LEAN YOUR TORSO AT A 45° ANGLE, FOCUS ON PULLING THE WEIGHT STRAIGHT DOWN, NOT \"IN\"","mz":{"back":1,"chest":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"RAISE THE DUMBBELL \"OUT\" NOT \"UP\", MIND MUSCLE CONNECTION WITH MIDDLE FIBERS","mz":{"shoulders":1}},{"n":"ROPE FACE PULL","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"PULL YOUR ELBOWS UP AND OUT, SQUEEZE YOUR SHOULDER BLADES TOGETHER","mz":{"shoulders":1,"back":0.5}},{"n":"EZ BAR SKULL CRUSHER","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"ARC THE BAR BACK BEHIND YOUR HEAD, KEEP CONSTANT TENSION ON TRICEPS","mz":{"triceps":1}}]},{"d":5,"focus":"DELTOID FOCUSED FULL BODY","ex":[{"n":"OVERHEAD PRESS","ws":"4","r":"10","rpe":"65%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1,"triceps":0.5}},{"n":"EGYPTIAN LATERAL RAISE","ws":"3","r":"8","rpe":"RPE8","rest":"1-2 MIN","note":"2-SECOND ECCENTRIC. LEAN AWAY FROM THE CABLE, FOCUS ON SQUEEZING YOUR DELTS","mz":{"shoulders":1}},{"n":"CABLE SEATED ROW","ws":"3","r":"12","rpe":"RPE7","rest":"1-3 MIN","note":"FOCUS ON SQUEEZING YOUR SHOULDER BLADES TOGETHER, PULL WITH YOUR ELBOWS DOWN AND IN","mz":{"back":1,"biceps":0.5}},{"n":"SEATED HIP ABDUCTION","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON DRIVING YOUR KNEES OUT","mz":{"glutes":1}},{"n":"INCLINE DUMBBELL CURL","ws":"2","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"BRACE UPPER BACK AGAINST BENCH, 45 DEGREE INCLINE, KEEP SHOULDERS BACK AS YOU CURL","mz":{"biceps":1}},{"n":"BICYCLE CRUNCH","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON FLEXING AND ROTATING YOUR SPINE, BRING YOUR LEFT ELBOW TO RIGHT KNEE, RIGHT ELBOW TO LEFT KNEE","mz":{"abs":1}},{"n":"STANDING CALF RAISE","ws":"4","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"PRESS ONTO YOUR TOES","mz":{"calves":1}},{"n":"PUSH UP","ws":"2","r":"RPE ONLY","rpe":"RPE6","rest":"1-2 MIN","note":"PERFORM AS MANY REPS AS YOU CAN TO HIT TARGET RPE","mz":{"chest":1,"triceps":0.5}}]}]},{"wk":3,"blk":1,"days":[{"d":1,"focus":"LOWER FOCUSED FULL BODY","ex":[{"n":"BACK SQUAT","ws":"4","r":"4","rpe":"80%","rest":"2-4 MIN","note":"SIT BACK AND DOWN, 15° TOE FLARE, DRIVE YOUR KNEES OUT LATERALLY","mz":{"quads":1,"glutes":1,"hamstrings":0.5}},{"n":"DUMBBELL INCLINE PRESS","ws":"3","r":"8","rpe":"RPE9","rest":"2-3 MIN","note":"~45 DEGREE INCLINE, MIND MUSCLE CONNECTION WITH UPPER PECS","mz":{"chest":1,"shoulders":0.5,"triceps":0.5}},{"n":"LYING LEG CURL","ws":"3","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR HAMSTRINGS TO MOVE THE WEIGHT","mz":{"hamstrings":1}},{"n":"PRONATED PULLDOWN","ws":"3","r":"10","rpe":"RPE7","rest":"2-3 MIN","note":"PULL YOUR ELBOWS DOWN AND IN","mz":{"back":1,"biceps":0.5}},{"n":"SUPINATED EZ BAR CURL","ws":"3","r":"15/15","rpe":"RPE10","rest":"1-2 MIN","note":"DROPSET. DROP WEIGHT BY ~50% ON SECOND 15 REPS. 30 REPS TOTAL.","mz":{"biceps":1}},{"n":"HANGING LEG RAISE","ws":"3","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"ROLL HIPS \"UP\" AS YOU SQUEEZE LOWER ABS, AVOID SWINGING","mz":{"abs":1}}]},{"d":2,"focus":"CHEST FOCUSED FULL BODY","ex":[{"n":"BARBELL BENCH PRESS","ws":"3","r":"3","rpe":"85%","rest":"2-4 MIN","note":"SET UP A COMFORTABLE ARCH, 1-2 SECOND PAUSE ON CHEST, EXPLODE OFF CHEST WITH MAX FORCE","mz":{"chest":1,"triceps":0.5,"shoulders":0.5}},{"n":"LOW TO HIGH CABLE FLYE","ws":"3","r":"15","rpe":"RPE9","rest":"1-2 MIN","note":"START WITH YOUR HANDS OUT TO YOUR SIDES AND PALMS FACING THE CEILING, FOCUS ON PULLING YOUR ELBOWS UP AND IN WHILE ROTATING YOUR PALMS TO FACE THE FLOOR","mz":{"chest":1}},{"n":"BARBELL HIP THRUST OR ROMANIAN DEADLIFT","ws":"3","r":"12","rpe":"RPE7","rest":"2-3 MIN","note":"HIP THRUST IF GLUTES ARE PRIORITY, RDL IF HAMSTRINGS ARE PRIORITY FOR YOU. FOCUS ON MIND MUSCLE CONNECTION.","mz":{"glutes":1,"hamstrings":1}},{"n":"CHEST-SUPPORTED T-BAR ROW","ws":"3","r":"15","rpe":"RPE7","rest":"1-3 MIN","note":"SQUEEZE YOUR SHOULDER BLADES TOGETHER AT THE TOP, LET THEM ROUND FORWARD AT THE BOTTOM","mz":{"back":1,"biceps":0.5}},{"n":"ARNOLD PRESS","ws":"3","r":"10","rpe":"RPE7","rest":"1-3 MIN","note":"START WITH YOUR ELBOWS IN FRONT OF YOU AND PALMS FACING IN. ROTATE THE DUMBBELLS SO THAT YOUR PALMS FACE FORWARD AS YOU PRESS.","mz":{"shoulders":1,"triceps":0.5}},{"n":"TRICEP PRESSDOWN","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR TRICEPS TO MOVE THE WEIGHT","mz":{"triceps":1}},{"n":"HEX BAR OR SMITH MACHINE SHRUG","ws":"3","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"SHRUG UP AND IN, PULL SHOULDERS UP TO EARS!","mz":{"back":1,"shoulders":0.5}}]},{"d":3,"focus":"BACK FOCUSED FULL BODY","ex":[{"n":"WEIGHTED PULL-UP","ws":"3","r":"6","rpe":"RPE9","rest":"2-3 MIN","note":"1.5X SHOULDER WIDTH GRIP, PULL YOUR CHEST TO THE BAR","mz":{"back":1,"biceps":1}},{"n":"HUMBLE ROW","ws":"3","r":"10","rpe":"RPE9","rest":"2-3 MIN","note":"PIN YOUR LOWER CHEST AGAINST THE TOP OF AN INCLINE BENCH: https://www.instagram.com/p/B5GeRJoBAc1/","mz":{"back":1,"biceps":0.5}},{"n":"LEG PRESS","ws":"3","r":"15","rpe":"RPE7","rest":"2-3 MIN","note":"LOW/MEDIUM/HIGH FOOT PLACEMENT, DON'T ALLOW YOUR LOWER BACK TO ROUND","mz":{"quads":1,"glutes":0.5}},{"n":"STANDING CALF RAISE","ws":"4","r":"8","rpe":"RPE7","rest":"1-2 MIN","note":"1-2 SECOND PAUSE AT THE BOTTOM OF EACH REP","mz":{"calves":1}},{"n":"CABLE ROPE UPRIGHT ROW","ws":"3","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING THE UPPER TRAPS AT THE TOP","mz":{"shoulders":1,"back":0.5}},{"n":"HAMMER CURL","ws":"3","r":"8","rpe":"RPE9","rest":"1-2 MIN","note":"3-SECOND ECCENTRIC. ARC THE DUMBBELL \"OUT\" NOT \"UP\", FOCUS ON SQUEEZING YOUR FOREARMS","mz":{"biceps":1,"forearms":1}}]},{"d":4,"focus":"LOWER FOCUSED FULL BODY 2","ex":[{"n":"DEADLIFT","ws":"4","r":"2","rpe":"87.5%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1,"hamstrings":1,"glutes":1}},{"n":"DIP","ws":"3","r":"10","rpe":"RPE9","rest":"2-3 MIN","note":"TUCK YOUR ELBOWS AT 45°, LEAN YOUR TORSO FORWARD 15°, SHOULDER WIDTH OR SLIGHTLY WIDER GRIP.","mz":{"chest":1,"triceps":1}},{"n":"GLUTE HAM RAISE","ws":"3","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"KEEP LOWER BACK STRAIGHT, USE HAMSTRINGS TO CURL YOUR BODY UP","mz":{"hamstrings":1,"glutes":0.5}},{"n":"LEG EXTENSION","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR QUADS TO MOVE THE WEIGHT","mz":{"quads":1}},{"n":"CABLE PULL-OVER","ws":"3","r":"15","rpe":"RPE7","rest":"1-3 MIN","note":"LEAN YOUR TORSO AT A 45° ANGLE, FOCUS ON PULLING THE WEIGHT STRAIGHT DOWN, NOT \"IN\"","mz":{"back":1,"chest":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"RAISE THE DUMBBELL \"OUT\" NOT \"UP\", MIND MUSCLE CONNECTION WITH MIDDLE FIBERS","mz":{"shoulders":1}},{"n":"ROPE FACE PULL","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"PULL YOUR ELBOWS UP AND OUT, SQUEEZE YOUR SHOULDER BLADES TOGETHER","mz":{"shoulders":1,"back":0.5}},{"n":"EZ BAR SKULL CRUSHER","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"ARC THE BAR BACK BEHIND YOUR HEAD, KEEP CONSTANT TENSION ON TRICEPS","mz":{"triceps":1}}]},{"d":5,"focus":"DELTOID FOCUSED FULL BODY","ex":[{"n":"OVERHEAD PRESS","ws":"4","r":"6","rpe":"77.5%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1,"triceps":0.5}},{"n":"EGYPTIAN LATERAL RAISE","ws":"3","r":"8","rpe":"RPE9","rest":"1-2 MIN","note":"2-SECOND ECCENTRIC. LEAN AWAY FROM THE CABLE, FOCUS ON SQUEEZING YOUR DELTS","mz":{"shoulders":1}},{"n":"CABLE SEATED ROW","ws":"3","r":"12","rpe":"RPE7","rest":"1-3 MIN","note":"FOCUS ON SQUEEZING YOUR SHOULDER BLADES TOGETHER, PULL WITH YOUR ELBOWS DOWN AND IN","mz":{"back":1,"biceps":0.5}},{"n":"SEATED HIP ABDUCTION","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON DRIVING YOUR KNEES OUT","mz":{"glutes":1}},{"n":"INCLINE DUMBBELL CURL","ws":"2","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"BRACE UPPER BACK AGAINST BENCH, 45 DEGREE INCLINE, KEEP SHOULDERS BACK AS YOU CURL","mz":{"biceps":1}},{"n":"BICYCLE CRUNCH","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON FLEXING AND ROTATING YOUR SPINE, BRING YOUR LEFT ELBOW TO RIGHT KNEE, RIGHT ELBOW TO LEFT KNEE","mz":{"abs":1}},{"n":"STANDING CALF RAISE","ws":"4","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"PRESS ONTO YOUR TOES","mz":{"calves":1}},{"n":"PUSH UP","ws":"2","r":"RPE ONLY","rpe":"RPE7","rest":"1-2 MIN","note":"PERFORM AS MANY REPS AS YOU CAN TO HIT TARGET RPE","mz":{"chest":1,"triceps":0.5}}]}]},{"wk":4,"blk":1,"days":[{"d":1,"focus":"LOWER FOCUSED FULL BODY","ex":[{"n":"BACK SQUAT","ws":"3","r":"5","rpe":"80%","rest":"2-4 MIN","note":"SIT BACK AND DOWN, 15° TOE FLARE, DRIVE YOUR KNEES OUT LATERALLY","mz":{"quads":1,"glutes":1,"hamstrings":0.5}},{"n":"DUMBBELL INCLINE PRESS","ws":"3","r":"8","rpe":"RPE9","rest":"2-3 MIN","note":"~45 DEGREE INCLINE, MIND MUSCLE CONNECTION WITH UPPER PECS","mz":{"chest":1,"shoulders":0.5,"triceps":0.5}},{"n":"LYING LEG CURL","ws":"3","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR HAMSTRINGS TO MOVE THE WEIGHT","mz":{"hamstrings":1}},{"n":"PRONATED PULLDOWN","ws":"3","r":"10","rpe":"RPE8","rest":"2-3 MIN","note":"PULL YOUR ELBOWS DOWN AND IN","mz":{"back":1,"biceps":0.5}},{"n":"SUPINATED EZ BAR CURL","ws":"3","r":"15/15","rpe":"RPE10","rest":"1-2 MIN","note":"DROPSET. DROP WEIGHT BY ~50% ON SECOND 15 REPS. 30 REPS TOTAL.","mz":{"biceps":1}},{"n":"HANGING LEG RAISE","ws":"3","r":"12","rpe":"RPE8","rest":"1-2 MIN","note":"ROLL HIPS \"UP\" AS YOU SQUEEZE LOWER ABS, AVOID SWINGING","mz":{"abs":1}}]},{"d":2,"focus":"CHEST FOCUSED FULL BODY","ex":[{"n":"BARBELL BENCH PRESS","ws":"3","r":"5","rpe":"80%","rest":"2-4 MIN","note":"SET UP A COMFORTABLE ARCH, 1-2 SECOND PAUSE ON CHEST, EXPLODE OFF CHEST WITH MAX FORCE","mz":{"chest":1,"triceps":0.5,"shoulders":0.5}},{"n":"LOW TO HIGH CABLE FLYE","ws":"3","r":"15","rpe":"RPE9","rest":"1-2 MIN","note":"START WITH YOUR HANDS OUT TO YOUR SIDES AND PALMS FACING THE CEILING, FOCUS ON PULLING YOUR ELBOWS UP AND IN WHILE ROTATING YOUR PALMS TO FACE THE FLOOR","mz":{"chest":1}},{"n":"BARBELL HIP THRUST OR ROMANIAN DEADLIFT","ws":"3","r":"12","rpe":"RPE8","rest":"2-3 MIN","note":"HIP THRUST IF GLUTES ARE PRIORITY, RDL IF HAMSTRINGS ARE PRIORITY FOR YOU. FOCUS ON MIND MUSCLE CONNECTION.","mz":{"glutes":1,"hamstrings":1}},{"n":"CHEST-SUPPORTED T-BAR ROW","ws":"3","r":"15","rpe":"RPE8","rest":"1-3 MIN","note":"SQUEEZE YOUR SHOULDER BLADES TOGETHER AT THE TOP, LET THEM ROUND FORWARD AT THE BOTTOM","mz":{"back":1,"biceps":0.5}},{"n":"ARNOLD PRESS","ws":"3","r":"10","rpe":"RPE8","rest":"1-3 MIN","note":"START WITH YOUR ELBOWS IN FRONT OF YOU AND PALMS FACING IN. ROTATE THE DUMBBELLS SO THAT YOUR PALMS FACE FORWARD AS YOU PRESS.","mz":{"shoulders":1,"triceps":0.5}},{"n":"TRICEP PRESSDOWN","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR TRICEPS TO MOVE THE WEIGHT","mz":{"triceps":1}},{"n":"HEX BAR OR SMITH MACHINE SHRUG","ws":"3","r":"12","rpe":"RPE8","rest":"1-2 MIN","note":"SHRUG UP AND IN, PULL SHOULDERS UP TO EARS!","mz":{"back":1,"shoulders":0.5}}]},{"d":3,"focus":"BACK FOCUSED FULL BODY","ex":[{"n":"WEIGHTED PULL-UP","ws":"3","r":"6","rpe":"RPE9","rest":"2-3 MIN","note":"1.5X SHOULDER WIDTH GRIP, PULL YOUR CHEST TO THE BAR","mz":{"back":1,"biceps":1}},{"n":"HUMBLE ROW","ws":"3","r":"10","rpe":"RPE9","rest":"2-3 MIN","note":"PIN YOUR LOWER CHEST AGAINST THE TOP OF AN INCLINE BENCH: https://www.instagram.com/p/B5GeRJoBAc1/","mz":{"back":1,"biceps":0.5}},{"n":"LEG PRESS","ws":"3","r":"15","rpe":"RPE8","rest":"2-3 MIN","note":"LOW/MEDIUM/HIGH FOOT PLACEMENT, DON'T ALLOW YOUR LOWER BACK TO ROUND","mz":{"quads":1,"glutes":0.5}},{"n":"STANDING CALF RAISE","ws":"4","r":"8","rpe":"RPE8","rest":"1-2 MIN","note":"1-2 SECOND PAUSE AT THE BOTTOM OF EACH REP","mz":{"calves":1}},{"n":"CABLE ROPE UPRIGHT ROW","ws":"3","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING THE UPPER TRAPS AT THE TOP","mz":{"shoulders":1,"back":0.5}},{"n":"HAMMER CURL","ws":"3","r":"8","rpe":"RPE9","rest":"1-2 MIN","note":"3-SECOND ECCENTRIC. ARC THE DUMBBELL \"OUT\" NOT \"UP\", FOCUS ON SQUEEZING YOUR FOREARMS","mz":{"biceps":1,"forearms":1}}]},{"d":4,"focus":"LOWER FOCUSED FULL BODY 2","ex":[{"n":"RESET DEADLIFT","ws":"3","r":"5","rpe":"80%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1,"hamstrings":1,"glutes":1}},{"n":"DIP","ws":"3","r":"10","rpe":"RPE9","rest":"2-3 MIN","note":"TUCK YOUR ELBOWS AT 45°, LEAN YOUR TORSO FORWARD 15°, SHOULDER WIDTH OR SLIGHTLY WIDER GRIP.","mz":{"chest":1,"triceps":1}},{"n":"GLUTE HAM RAISE","ws":"3","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"KEEP LOWER BACK STRAIGHT, USE HAMSTRINGS TO CURL YOUR BODY UP","mz":{"hamstrings":1,"glutes":0.5}},{"n":"LEG EXTENSION","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR QUADS TO MOVE THE WEIGHT","mz":{"quads":1}},{"n":"CABLE PULL-OVER","ws":"3","r":"15","rpe":"RPE8","rest":"1-3 MIN","note":"LEAN YOUR TORSO AT A 45° ANGLE, FOCUS ON PULLING THE WEIGHT STRAIGHT DOWN, NOT \"IN\"","mz":{"back":1,"chest":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"3","r":"20","rpe":"RPE8","rest":"1-2 MIN","note":"RAISE THE DUMBBELL \"OUT\" NOT \"UP\", MIND MUSCLE CONNECTION WITH MIDDLE FIBERS","mz":{"shoulders":1}},{"n":"ROPE FACE PULL","ws":"3","r":"20","rpe":"RPE8","rest":"1-2 MIN","note":"PULL YOUR ELBOWS UP AND OUT, SQUEEZE YOUR SHOULDER BLADES TOGETHER","mz":{"shoulders":1,"back":0.5}},{"n":"EZ BAR SKULL CRUSHER","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"ARC THE BAR BACK BEHIND YOUR HEAD, KEEP CONSTANT TENSION ON TRICEPS","mz":{"triceps":1}}]},{"d":5,"focus":"DELTOID FOCUSED FULL BODY","ex":[{"n":"OVERHEAD PRESS","ws":"4","r":"10","rpe":"67.5%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1,"triceps":0.5}},{"n":"EGYPTIAN LATERAL RAISE","ws":"3","r":"8","rpe":"RPE9","rest":"1-2 MIN","note":"2-SECOND ECCENTRIC. LEAN AWAY FROM THE CABLE, FOCUS ON SQUEEZING YOUR DELTS","mz":{"shoulders":1}},{"n":"CABLE SEATED ROW","ws":"3","r":"12","rpe":"RPE8","rest":"1-3 MIN","note":"FOCUS ON SQUEEZING YOUR SHOULDER BLADES TOGETHER, PULL WITH YOUR ELBOWS DOWN AND IN","mz":{"back":1,"biceps":0.5}},{"n":"SEATED HIP ABDUCTION","ws":"3","r":"20","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON DRIVING YOUR KNEES OUT","mz":{"glutes":1}},{"n":"INCLINE DUMBBELL CURL","ws":"2","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"BRACE UPPER BACK AGAINST BENCH, 45 DEGREE INCLINE, KEEP SHOULDERS BACK AS YOU CURL","mz":{"biceps":1}},{"n":"BICYCLE CRUNCH","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON FLEXING AND ROTATING YOUR SPINE, BRING YOUR LEFT ELBOW TO RIGHT KNEE, RIGHT ELBOW TO LEFT KNEE","mz":{"abs":1}},{"n":"STANDING CALF RAISE","ws":"4","r":"12","rpe":"RPE8","rest":"1-2 MIN","note":"PRESS ONTO YOUR TOES","mz":{"calves":1}},{"n":"PUSH UP","ws":"2","r":"RPE ONLY","rpe":"RPE8","rest":"1-2 MIN","note":"PERFORM AS MANY REPS AS YOU CAN TO HIT TARGET RPE","mz":{"chest":1,"triceps":0.5}}]}]},{"wk":5,"blk":2,"days":[{"d":1,"focus":"LOWER FOCUSED FULL BODY","ex":[{"n":"[TOPSET] BACK SQUAT","ws":"1","r":"3-5","rpe":"87.5%","rest":"2-4 MIN","note":"IF YOU’RE FEELING STRONG AND CONFIDENT, GO FOR 5. IF YOU FEEL LESS STRONG, PLAY IT SAFE WITH 3-4 REPS.","mz":{"quads":1,"glutes":1,"hamstrings":0.5}},{"n":"[BACK OFF] BACK SQUAT","ws":"2","r":"5","rpe":"75%","rest":"2-4 MIN","note":"SIT BACK AND DOWN, 15° TOE FLARE, DRIVE YOUR KNEES OUT LATERALLY","mz":{"quads":1,"glutes":1,"hamstrings":0.5}},{"n":"BARBELL OVERHEAD PRESS","ws":"4","r":"6","rpe":"80%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1,"triceps":0.5}},{"n":"SWISS BALL LEG CURL","ws":"3","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"PREVENT YOUR HIPS FROM TOUCHING THE GROUND. DIG YOUR HEELS INTO THE BALL","mz":{"hamstrings":1}},{"n":"CHIN-UP","ws":"4","r":"8","rpe":"RPE7","rest":"2-3 MIN","note":"1.5X SHOULDER WIDTH GRIP, PULL YOUR CHEST TO THE BAR","mz":{"back":1,"biceps":1}},{"n":"SUPINATED EZ BAR CURL","ws":"3","r":"10+2","rpe":"RPE10","rest":"1-2 MIN","note":"10 REPS WITH GOOD CONTROL + 2 REPS WITH MODERATE CHEATING/MOMENTUM","mz":{"biceps":1}},{"n":"AB WHEEL ROLLOUT","ws":"3","r":"6","rpe":"RPE7","rest":"1-2 MIN","note":"SQUEEZE YOUR GLUTES, DON'T PULL FROM YOUR ARMS","mz":{"abs":1}}]},{"d":2,"focus":"CHEST FOCUSED FULL BODY","ex":[{"n":"BARBELL BENCH PRESS","ws":"3","r":"3","rpe":"87.5%","rest":"2-4 MIN","note":"ELBOWS AT A 45° ANGLE. SQUEEZE YOUR SHOULDER BLADES AND STAY FIRM ON THE BENCH","mz":{"chest":1,"triceps":0.5,"shoulders":0.5}},{"n":"LOW INCLINE DUMBBELL PRESS","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"15° BENCH ANGLE. TUCK YOUR ELBOWS","mz":{"chest":1,"triceps":0.5}},{"n":"BARBELL HIP THRUST OR ROMANIAN DEADLIFT","ws":"4","r":"12","rpe":"RPE7","rest":"2-3 MIN","note":"HIP THRUST IF GLUTES ARE PRIORITY, RDL IF HAMSTRINGS ARE PRIORITY FOR YOU. FOCUS ON MIND MUSCLE CONNECTION.","mz":{"glutes":1,"hamstrings":1}},{"n":"DUMBBELL ROW","ws":"4","r":"12","rpe":"RPE7","rest":"1-3 MIN","note":"PULL THE DUMBBELL TO YOUR HIP","mz":{"back":1,"biceps":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"4","r":"15","rpe":"RPE7","rest":"1-3 MIN","note":"TILT THE DUMBBELL SUCH THAT YOUR PINKY COMES UP FIRST","mz":{"shoulders":1}},{"n":"OVERHEAD TRICEP EXTENSION","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR TRICEPS TO MOVE THE WEIGHT","mz":{"triceps":1}},{"n":"HEX BAR OR SMITH MACHINE SHRUG","ws":"3","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"SHRUG UP AND IN, PULL SHOULDERS UP TO EARS!","mz":{"back":1,"shoulders":0.5}}]},{"d":3,"focus":"BACK FOCUSED FULL BODY","ex":[{"n":"WEIGHTED PULL-UP","ws":"3","r":"6","rpe":"RPE9","rest":"2-3 MIN","note":"1.5X SHOULDER WIDTH GRIP, PULL YOUR CHEST TO THE BAR","mz":{"back":1,"biceps":1}},{"n":"BANDED CHEST- SUPPORTED T-BAR ROW","ws":"4","r":"10","rpe":"RPE8","rest":"2-3 MIN","note":"SQUEEZE YOUR SHOULDER BLADES TOGETHER AT THE TOP, LET THEM ROUND FORWARD AT THE BOTTOM","mz":{"back":1,"biceps":0.5}},{"n":"SINGLE-LEG LEG PRESS","ws":"4","r":"15","rpe":"RPE7","rest":"2-3 MIN","note":"LOW/MEDIUM/HIGH FOOT PLACEMENT, DON'T ALLOW YOUR LOWER BACK TO ROUND","mz":{"quads":1,"glutes":0.5}},{"n":"ECCENTRIC- ACCENTUATED STANDING CALF RAISE","ws":"4","r":"8","rpe":"RPE7","rest":"1-2 MIN","note":"PRESS ONTO YOUR TOES. 4-SECOND ECCENTRIC","mz":{"calves":1}},{"n":"CABLE ROPE UPRIGHT ROW","ws":"4","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING THE UPPER TRAPS AT THE TOP","mz":{"shoulders":1,"back":0.5}},{"n":"CABLE SINGLE-ARM CURL","ws":"4","r":"8","rpe":"RPE7","rest":"1-2 MIN","note":"KEEP YOUR SHOULDER JOINT HYPEREXTENDED (ELBOW BEHIND TORSO)","mz":{"biceps":1}}]},{"d":4,"focus":"LOWER FOCUSED FULL BODY 2","ex":[{"n":"[TOPSET] DEADLIFT","ws":"1","r":"2","rpe":"90%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1,"hamstrings":1,"glutes":1}},{"n":"[BACK OFF] RESET DEADLIFT","ws":"3","r":"2","rpe":"80%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1,"hamstrings":1,"glutes":1}},{"n":"DECLINE BENCH PRESS","ws":"4","r":"8","rpe":"RPE7","rest":"2-3 MIN","note":"CONSTANT TENSION REPS, TOUCH BAR TO CHEST","mz":{"chest":1,"triceps":0.5}},{"n":"GLUTE HAM RAISE","ws":"4","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"KEEP LOWER BACK STRAIGHT, USE HAMSTRINGS TO CURL YOUR BODY UP","mz":{"hamstrings":1,"glutes":0.5}},{"n":"LEG EXTENSION","ws":"4","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR QUADS TO MOVE THE WEIGHT","mz":{"quads":1}},{"n":"CABLE PULL-OVER","ws":"3","r":"15","rpe":"RPE7","rest":"1-3 MIN","note":"LEAN YOUR TORSO AT A 45° ANGLE, FOCUS ON PULLING THE WEIGHT STRAIGHT DOWN, NOT \"IN\"","mz":{"back":1,"chest":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"RAISE THE DUMBBELL \"OUT\" NOT \"UP\", MIND MUSCLE CONNECTION WITH MIDDLE FIBERS","mz":{"shoulders":1}},{"n":"EZ BAR SKULL CRUSHER","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"ARC THE BAR BACK BEHIND YOUR HEAD, KEEP CONSTANT TENSION ON TRICEPS","mz":{"triceps":1}}]},{"d":5,"focus":"DELTOID FOCUSED FULL BODY","ex":[{"n":"OVERHEAD PRESS","ws":"3","r":"8","rpe":"80%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1,"triceps":0.5}},{"n":"CABLE LATERAL RAISE","ws":"3","r":"8","rpe":"RPE8","rest":"1-2 MIN","note":"SWING THE WEIGHT \"OUT\", NOT \"UP\"","mz":{"shoulders":1}},{"n":"PENDLAY ROW","ws":"4","r":"10","rpe":"RPE7","rest":"1-3 MIN","note":"KEEP A FLAT BACK, PULL YOUR ELBOWS BACK AT 45 DEGREE ANGLE","mz":{"back":1,"biceps":0.5}},{"n":"SEATED HIP ABDUCTION","ws":"4","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON DRIVING YOUR KNEES OUT","mz":{"glutes":1}},{"n":"EZ BAR CURL 21S","ws":"2","r":"7/7/7","rpe":"RPE7","rest":"1-2 MIN","note":"FIRST 7 REPS BOTTOM HALF OF ROM, NEXT 7 REPS TOP HALF OF ROM, LAST 7 REPS FULL ROM","mz":{"biceps":1,"forearms":0.5}},{"n":"CABLE CRUNCH","ws":"4","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON FLEXING YOUR SPINE. AVOID YANKING WITH YOUR ARMS","mz":{"abs":1}},{"n":"STANDING CALF RAISE","ws":"4","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"1-2 SECOND PAUSE AT THE BOTTOM OF EACH REP","mz":{"calves":1}},{"n":"PUSH UP","ws":"2","r":"RPE ONLY","rpe":"RPE7","rest":"1-2 MIN","note":"PERFORM AS MANY REPS AS YOU CAN TO HIT TARGET RPE","mz":{"chest":1,"triceps":0.5}}]}]},{"wk":6,"blk":2,"days":[{"d":1,"focus":"LOWER FOCUSED FULL BODY","ex":[{"n":"[TOPSET] BACK SQUAT","ws":"1","r":"2","rpe":"90%","rest":"2-4 MIN","note":"SIT BACK AND DOWN, 15° TOE FLARE, DRIVE YOUR KNEES OUT LATERALLY","mz":{"quads":1,"glutes":1,"hamstrings":0.5}},{"n":"[BACK OFF] BACK SQUAT","ws":"2","r":"3","rpe":"85%","rest":"2-4 MIN","note":"SIT BACK AND DOWN, 15° TOE FLARE, DRIVE YOUR KNEES OUT LATERALLY","mz":{"quads":1,"glutes":1,"hamstrings":0.5}},{"n":"BARBELL OVERHEAD PRESS","ws":"4","r":"8","rpe":"75%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1,"triceps":0.5}},{"n":"SWISS BALL LEG CURL","ws":"3","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"PREVENT YOUR HIPS FROM TOUCHING THE GROUND. DIG YOUR HEELS INTO THE BALL","mz":{"hamstrings":1}},{"n":"CHIN-UP","ws":"4","r":"8","rpe":"RPE7","rest":"2-3 MIN","note":"SUPINATED (UNDERHAND) SHOULDER WIDTH GRIP, PULL WITH LATS","mz":{"back":1,"biceps":1}},{"n":"SUPINATED EZ BAR CURL","ws":"3","r":"10+2","rpe":"RPE10","rest":"1-2 MIN","note":"10 REPS WITH GOOD CONTROL + 2 REPS WITH MODERATE CHEATING/MOMENTUM","mz":{"biceps":1}},{"n":"AB WHEEL ROLLOUT","ws":"3","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"SQUEEZE YOUR GLUTES, DON'T PULL FROM YOUR ARMS","mz":{"abs":1}}]},{"d":2,"focus":"CHEST FOCUSED FULL BODY","ex":[{"n":"BARBELL BENCH PRESS","ws":"3","r":"5","rpe":"85%","rest":"2-4 MIN","note":"ELBOWS AT A 45° ANGLE. SQUEEZE YOUR SHOULDER BLADES AND STAY FIRM ON THE BENCH","mz":{"chest":1,"triceps":0.5,"shoulders":0.5}},{"n":"LOW INCLINE DUMBBELL PRESS","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"15° BENCH ANGLE. TUCK YOUR ELBOWS","mz":{"chest":1,"triceps":0.5}},{"n":"BARBELL HIP THRUST OR ROMANIAN DEADLIFT","ws":"4","r":"12","rpe":"RPE7","rest":"2-3 MIN","note":"HIP THRUST IF GLUTES ARE PRIORITY, RDL IF HAMSTRINGS ARE PRIORITY FOR YOU. FOCUS ON MIND MUSCLE CONNECTION.","mz":{"glutes":1,"hamstrings":1}},{"n":"DUMBBELL ROW","ws":"4","r":"12","rpe":"RPE7","rest":"1-3 MIN","note":"PULL THE DUMBBELL TO YOUR HIP","mz":{"back":1,"biceps":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"4","r":"15","rpe":"RPE7","rest":"1-3 MIN","note":"RAISE THE DUMBBELL \"OUT\" NOT \"UP\", MIND MUSCLE CONNECTION WITH MIDDLE FIBERS","mz":{"shoulders":1}},{"n":"OVERHEAD TRICEP EXTENSION","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR TRICEPS TO MOVE THE WEIGHT","mz":{"triceps":1}},{"n":"HEX BAR OR SMITH MACHINE SHRUG","ws":"3","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"SHRUG UP AND IN, PULL SHOULDERS UP TO EARS!","mz":{"back":1,"shoulders":0.5}}]},{"d":3,"focus":"BACK FOCUSED FULL BODY","ex":[{"n":"WEIGHTED PULL-UP","ws":"4","r":"3","rpe":"RPE9","rest":"2-3 MIN","note":"1.5X SHOULDER WIDTH GRIP, PULL YOUR CHEST TO THE BAR","mz":{"back":1,"biceps":1}},{"n":"BANDED CHEST- SUPPORTED T-BAR ROW","ws":"4","r":"10","rpe":"RPE8","rest":"2-3 MIN","note":"BE EXPLOSIVE AT THE BOTTOM, DRIVE ELBOWS BACK HARD!","mz":{"back":1,"biceps":0.5}},{"n":"SINGLE-LEG LEG PRESS","ws":"4","r":"15","rpe":"RPE7","rest":"2-3 MIN","note":"LOW/MEDIUM/HIGH FOOT PLACEMENT, DON'T ALLOW YOUR LOWER BACK TO ROUND","mz":{"quads":1,"glutes":0.5}},{"n":"ECCENTRIC- ACCENTUATED STANDING CALF RAISE","ws":"4","r":"8","rpe":"RPE7","rest":"1-2 MIN","note":"PRESS ONTO YOUR TOES. 4-SECOND ECCENTRIC","mz":{"calves":1}},{"n":"CABLE ROPE UPRIGHT ROW","ws":"4","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING THE UPPER TRAPS AT THE TOP","mz":{"shoulders":1,"back":0.5}},{"n":"CABLE SINGLE-ARM CURL","ws":"4","r":"8","rpe":"RPE7","rest":"1-2 MIN","note":"KEEP YOUR SHOULDER JOINT HYPEREXTENDED (ELBOW BEHIND TORSO)","mz":{"biceps":1}}]},{"d":4,"focus":"LOWER FOCUSED FULL BODY 2","ex":[{"n":"[TOPSET] DEADLIFT","ws":"1","r":"4","rpe":"85%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1,"hamstrings":1,"glutes":1}},{"n":"[BACK OFF] RESET DEADLIFT","ws":"3","r":"4","rpe":"75%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1,"hamstrings":1,"glutes":1}},{"n":"DECLINE BENCH PRESS","ws":"4","r":"8","rpe":"RPE7","rest":"2-3 MIN","note":"CONSTANT TENSION REPS, TOUCH BAR TO CHEST","mz":{"chest":1,"triceps":0.5}},{"n":"GLUTE HAM RAISE","ws":"4","r":"10","rpe":"RPE7","rest":"1-2 MIN","note":"KEEP LOWER BACK STRAIGHT, USE HAMSTRINGS TO CURL YOUR BODY UP","mz":{"hamstrings":1,"glutes":0.5}},{"n":"LEG EXTENSION","ws":"4","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR QUADS TO MOVE THE WEIGHT","mz":{"quads":1}},{"n":"CABLE PULL-OVER","ws":"3","r":"15","rpe":"RPE7","rest":"1-3 MIN","note":"LEAN YOUR TORSO AT A 45° ANGLE, FOCUS ON PULLING THE WEIGHT STRAIGHT DOWN, NOT \"IN\"","mz":{"back":1,"chest":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"RAISE THE DUMBBELL \"OUT\" NOT \"UP\", MIND MUSCLE CONNECTION WITH MIDDLE FIBERS","mz":{"shoulders":1}},{"n":"REVERSE PEC DECK","ws":"3","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"SWING THE WEIGHT \"OUT\", NOT \"BACK\"","mz":{"shoulders":1,"back":0.5}},{"n":"EZ BAR SKULL CRUSHER","ws":"3","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"ARC THE BAR BACK BEHIND YOUR HEAD, KEEP CONSTANT TENSION ON TRICEPS","mz":{"triceps":1}}]},{"d":5,"focus":"DELTOID FOCUSED FULL BODY","ex":[{"n":"OVERHEAD PRESS","ws":"4","r":"4","rpe":"82.5%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1,"triceps":0.5}},{"n":"CABLE LATERAL RAISE","ws":"3","r":"8","rpe":"RPE8","rest":"1-2 MIN","note":"SWING THE WEIGHT \"OUT\", NOT \"UP\"","mz":{"shoulders":1}},{"n":"PENDLAY ROW","ws":"4","r":"12","rpe":"RPE7","rest":"1-3 MIN","note":"KEEP A FLAT BACK, PULL YOUR ELBOWS BACK AT 45 DEGREE ANGLE","mz":{"back":1,"biceps":0.5}},{"n":"SEATED HIP ABDUCTION","ws":"4","r":"20","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON DRIVING YOUR KNEES OUT","mz":{"glutes":1}},{"n":"EZ BAR CURL 21S","ws":"2","r":"7/7/7","rpe":"RPE7","rest":"1-2 MIN","note":"FIRST 7 REPS BOTTOM HALF OF ROM, NEXT 7 REPS TOP HALF OF ROM, LAST 7 REPS FULL ROM","mz":{"biceps":1,"forearms":0.5}},{"n":"CABLE CRUNCH","ws":"4","r":"15","rpe":"RPE7","rest":"1-2 MIN","note":"FOCUS ON FLEXING YOUR SPINE. AVOID YANKING WITH YOUR ARMS","mz":{"abs":1}},{"n":"STANDING CALF RAISE","ws":"4","r":"12","rpe":"RPE7","rest":"1-2 MIN","note":"1-2 SECOND PAUSE AT THE BOTTOM OF EACH REP","mz":{"calves":1}},{"n":"PUSH UP","ws":"2","r":"RPE ONLY","rpe":"RPE7","rest":"1-2 MIN","note":"PERFORM AS MANY REPS AS YOU CAN TO HIT TARGET RPE","mz":{"chest":1,"triceps":0.5}}]}]},{"wk":7,"blk":2,"days":[{"d":1,"focus":"LOWER FOCUSED FULL BODY","ex":[{"n":"[TOPSET] BACK SQUAT","ws":"1","r":"6-8","rpe":"80%","rest":"2-4 MIN","note":"SIT BACK AND DOWN, 15° TOE FLARE, DRIVE YOUR KNEES OUT LATERALLY","mz":{"quads":1,"glutes":1,"hamstrings":0.5}},{"n":"[BACK OFF] BACK SQUAT","ws":"2","r":"8","rpe":"70%","rest":"2-4 MIN","note":"SIT BACK AND DOWN, 15° TOE FLARE, DRIVE YOUR KNEES OUT LATERALLY","mz":{"quads":1,"glutes":1,"hamstrings":0.5}},{"n":"BARBELL OVERHEAD PRESS","ws":"4","r":"10","rpe":"65%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1,"triceps":0.5}},{"n":"SWISS BALL LEG CURL","ws":"3","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"PREVENT YOUR HIPS FROM TOUCHING THE GROUND. DIG YOUR HEELS INTO THE BALL","mz":{"hamstrings":1}},{"n":"CHIN-UP","ws":"4","r":"8","rpe":"RPE8","rest":"2-3 MIN","note":"SUPINATED (UNDERHAND) SHOULDER WIDTH GRIP, PULL WITH LATS","mz":{"back":1,"biceps":1}},{"n":"SUPINATED EZ BAR CURL","ws":"3","r":"10+2","rpe":"RPE10","rest":"1-2 MIN","note":"10 REPS WITH GOOD CONTROL + 2 REPS WITH MODERATE CHEATING/MOMENTUM","mz":{"biceps":1}},{"n":"AB WHEEL ROLLOUT","ws":"3","r":"12","rpe":"RPE8","rest":"1-2 MIN","note":"SQUEEZE YOUR GLUTES, DON'T PULL FROM YOUR ARMS","mz":{"abs":1}}]},{"d":2,"focus":"CHEST FOCUSED FULL BODY","ex":[{"n":"BARBELL BENCH PRESS","ws":"3","r":"10","rpe":"75%","rest":"2-4 MIN","note":"ELBOWS AT A 45° ANGLE. SQUEEZE YOUR SHOULDER BLADES AND STAY FIRM ON THE BENCH","mz":{"chest":1,"triceps":0.5,"shoulders":0.5}},{"n":"LOW INCLINE DUMBBELL PRESS","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"15° BENCH ANGLE. TUCK YOUR ELBOWS","mz":{"chest":1,"triceps":0.5}},{"n":"BARBELL HIP THRUST OR ROMANIAN DEADLIFT","ws":"4","r":"12","rpe":"RPE8","rest":"2-3 MIN","note":"HIP THRUST IF GLUTES ARE PRIORITY, RDL IF HAMSTRINGS ARE PRIORITY FOR YOU. FOCUS ON MIND MUSCLE CONNECTION.","mz":{"glutes":1,"hamstrings":1}},{"n":"DUMBBELL ROW","ws":"4","r":"12","rpe":"RPE8","rest":"1-3 MIN","note":"PULL THE DUMBBELL TO YOUR HIP","mz":{"back":1,"biceps":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"4","r":"15","rpe":"RPE8","rest":"1-3 MIN","note":"RAISE THE DUMBBELL \"OUT\" NOT \"UP\", MIND MUSCLE CONNECTION WITH MIDDLE FIBERS","mz":{"shoulders":1}},{"n":"OVERHEAD TRICEP EXTENSION","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR TRICEPS TO MOVE THE WEIGHT","mz":{"triceps":1}},{"n":"HEX BAR OR SMITH MACHINE SHRUG","ws":"3","r":"12","rpe":"RPE8","rest":"1-2 MIN","note":"SHRUG UP AND IN, PULL SHOULDERS UP TO EARS!","mz":{"back":1,"shoulders":0.5}}]},{"d":3,"focus":"BACK FOCUSED FULL BODY","ex":[{"n":"WEIGHTED PULL-UP","ws":"3","r":"10","rpe":"RPE9","rest":"2-3 MIN","note":"1.5X SHOULDER WIDTH GRIP, PULL YOUR CHEST TO THE BAR","mz":{"back":1,"biceps":1}},{"n":"BANDED CHEST- SUPPORTED T-BAR ROW","ws":"4","r":"10","rpe":"RPE8","rest":"2-3 MIN","note":"BE EXPLOSIVE AT THE BOTTOM, DRIVE ELBOWS BACK HARD!","mz":{"back":1,"biceps":0.5}},{"n":"SINGLE-LEG LEG PRESS","ws":"4","r":"15","rpe":"RPE8","rest":"2-3 MIN","note":"LOW/MEDIUM/HIGH FOOT PLACEMENT, DON'T ALLOW YOUR LOWER BACK TO ROUND","mz":{"quads":1,"glutes":0.5}},{"n":"ECCENTRIC- ACCENTUATED STANDING CALF RAISE","ws":"4","r":"8","rpe":"RPE8","rest":"1-2 MIN","note":"PRESS ONTO YOUR TOES. 4-SECOND ECCENTRIC","mz":{"calves":1}},{"n":"CABLE ROPE UPRIGHT ROW","ws":"4","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING THE UPPER TRAPS AT THE TOP","mz":{"shoulders":1,"back":0.5}},{"n":"CABLE SINGLE-ARM CURL","ws":"4","r":"8","rpe":"RPE8","rest":"1-2 MIN","note":"KEEP YOUR SHOULDER JOINT HYPEREXTENDED (ELBOW BEHIND TORSO)","mz":{"biceps":1}}]},{"d":4,"focus":"LOWER FOCUSED FULL BODY 2","ex":[{"n":"[TOPSET] DEADLIFT","ws":"1","r":"6","rpe":"80%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1,"hamstrings":1,"glutes":1}},{"n":"[BACK OFF] RESET DEADLIFT","ws":"3","r":"6","rpe":"70%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1,"hamstrings":1,"glutes":1}},{"n":"DECLINE BENCH PRESS","ws":"4","r":"8","rpe":"RPE 7","rest":"2-3 MIN","note":"CONSTANT TENSION REPS, TOUCH BAR TO CHEST","mz":{"chest":1,"triceps":0.5}},{"n":"GLUTE HAM RAISE","ws":"4","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"KEEP LOWER BACK STRAIGHT, USE HAMSTRINGS TO CURL YOUR BODY UP","mz":{"hamstrings":1,"glutes":0.5}},{"n":"LEG EXTENSION","ws":"4","r":"12","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR QUADS TO MOVE THE WEIGHT","mz":{"quads":1}},{"n":"CABLE PULL-OVER","ws":"3","r":"15","rpe":"RPE8","rest":"1-3 MIN","note":"LEAN YOUR TORSO AT A 45° ANGLE, FOCUS ON PULLING THE WEIGHT STRAIGHT DOWN, NOT \"IN\"","mz":{"back":1,"chest":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"3","r":"20","rpe":"RPE8","rest":"1-2 MIN","note":"RAISE THE DUMBBELL \"OUT\" NOT \"UP\", MIND MUSCLE CONNECTION WITH MIDDLE FIBERS","mz":{"shoulders":1}},{"n":"REVERSE PEC DECK","ws":"3","r":"20","rpe":"RPE8","rest":"1-2 MIN","note":"SWING THE WEIGHT \"OUT\", NOT \"BACK\"","mz":{"shoulders":1,"back":0.5}},{"n":"EZ BAR SKULL CRUSHER","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"ARC THE BAR BACK BEHIND YOUR HEAD, KEEP CONSTANT TENSION ON TRICEPS","mz":{"triceps":1}}]},{"d":5,"focus":"DELTOID FOCUSED FULL BODY","ex":[{"n":"OVERHEAD PRESS","ws":"4","r":"6","rpe":"80%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1,"triceps":0.5}},{"n":"CABLE LATERAL RAISE","ws":"3","r":"8","rpe":"RPE8","rest":"1-2 MIN","note":"SWING THE WEIGHT \"OUT\", NOT \"UP\"","mz":{"shoulders":1}},{"n":"PENDLAY ROW","ws":"4","r":"12","rpe":"RPE8","rest":"1-3 MIN","note":"KEEP A FLAT BACK, PULL YOUR ELBOWS BACK AT 45 DEGREE ANGLE","mz":{"back":1,"biceps":0.5}},{"n":"SEATED HIP ABDUCTION","ws":"4","r":"20","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON DRIVING YOUR KNEES OUT","mz":{"glutes":1}},{"n":"EZ BAR CURL 21S","ws":"2","r":"7/7/7","rpe":"RPE8","rest":"1-2 MIN","note":"FIRST 7 REPS BOTTOM HALF OF ROM, NEXT 7 REPS TOP HALF OF ROM, LAST 7 REPS FULL ROM","mz":{"biceps":1,"forearms":0.5}},{"n":"CABLE CRUNCH","ws":"4","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON FLEXING YOUR SPINE. AVOID YANKING WITH YOUR ARMS","mz":{"abs":1}},{"n":"STANDING CALF RAISE","ws":"4","r":"12","rpe":"RPE8","rest":"1-2 MIN","note":"1-2 SECOND PAUSE AT THE BOTTOM OF EACH REP","mz":{"calves":1}},{"n":"PUSH UP","ws":"2","r":"RPE ONLY","rpe":"RPE7","rest":"1-2 MIN","note":"PERFORM AS MANY REPS AS YOU CAN TO HIT TARGET RPE","mz":{"chest":1,"triceps":0.5}}]}]},{"wk":8,"blk":2,"days":[{"d":1,"focus":"LOWER FOCUSED FULL BODY","ex":[{"n":"[TOPSET] BACK SQUAT","ws":"1","r":"2","rpe":"92.5%","rest":"2-4 MIN","note":"SIT BACK AND DOWN, 15° TOE FLARE, DRIVE YOUR KNEES OUT LATERALLY","mz":{"quads":1,"glutes":1,"hamstrings":0.5}},{"n":"[BACK OFF] BACK SQUAT","ws":"2","r":"2","rpe":"85%","rest":"2-4 MIN","note":"SIT BACK AND DOWN, 15° TOE FLARE, DRIVE YOUR KNEES OUT LATERALLY","mz":{"quads":1,"glutes":1,"hamstrings":0.5}},{"n":"BARBELL OVERHEAD PRESS","ws":"4","r":"5","rpe":"80%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1,"triceps":0.5}},{"n":"SWISS BALL LEG CURL","ws":"3","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"PREVENT YOUR HIPS FROM TOUCHING THE GROUND. DIG YOUR HEELS INTO THE BALL","mz":{"hamstrings":1}},{"n":"CHIN-UP","ws":"4","r":"8","rpe":"RPE8","rest":"2-3 MIN","note":"SUPINATED (UNDERHAND) SHOULDER WIDTH GRIP, PULL WITH LATS","mz":{"back":1,"biceps":1}},{"n":"SUPINATED EZ BAR CURL","ws":"3","r":"10+2","rpe":"RPE10","rest":"1-2 MIN","note":"10 REPS WITH GOOD CONTROL + 2 REPS WITH MODERATE CHEATING/MOMENTUM","mz":{"biceps":1}},{"n":"AB WHEEL ROLLOUT","ws":"3","r":"12","rpe":"RPE8","rest":"1-2 MIN","note":"SQUEEZE YOUR GLUTES, DON'T PULL FROM YOUR ARMS","mz":{"abs":1}}]},{"d":2,"focus":"CHEST FOCUSED FULL BODY","ex":[{"n":"BARBELL BENCH PRESS","ws":"4","r":"2","rpe":"90%","rest":"2-4 MIN","note":"ELBOWS AT A 45° ANGLE. SQUEEZE YOUR SHOULDER BLADES AND STAY FIRM ON THE BENCH","mz":{"chest":1,"triceps":0.5,"shoulders":0.5}},{"n":"LOW INCLINE DUMBBELL PRESS","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"15° BENCH ANGLE. TUCK YOUR ELBOWS","mz":{"chest":1,"triceps":0.5}},{"n":"BARBELL HIP THRUST OR ROMANIAN DEADLIFT","ws":"4","r":"12","rpe":"RPE8","rest":"2-3 MIN","note":"HIP THRUST IF GLUTES ARE PRIORITY, RDL IF HAMSTRINGS ARE PRIORITY FOR YOU. FOCUS ON MIND MUSCLE CONNECTION.","mz":{"glutes":1,"hamstrings":1}},{"n":"DUMBBELL ROW","ws":"4","r":"12","rpe":"RPE8","rest":"1-3 MIN","note":"PULL THE DUMBBELL TO YOUR HIP","mz":{"back":1,"biceps":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"4","r":"15","rpe":"RPE8","rest":"1-3 MIN","note":"RAISE THE DUMBBELL \"OUT\" NOT \"UP\", MIND MUSCLE CONNECTION WITH MIDDLE FIBERS","mz":{"shoulders":1}},{"n":"OVERHEAD TRICEP EXTENSION","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR TRICEPS TO MOVE THE WEIGHT","mz":{"triceps":1}},{"n":"HEX BAR OR SMITH MACHINE SHRUG","ws":"3","r":"12","rpe":"RPE8","rest":"1-2 MIN","note":"SHRUG UP AND IN, PULL SHOULDERS UP TO EARS!","mz":{"back":1,"shoulders":0.5}}]},{"d":3,"focus":"BACK FOCUSED FULL BODY","ex":[{"n":"WEIGHTED PULL-UP","ws":"4","r":"6","rpe":"RPE9","rest":"2-3 MIN","note":"1.5X SHOULDER WIDTH GRIP, PULL YOUR CHEST TO THE BAR","mz":{"back":1,"biceps":1}},{"n":"BANDED CHEST- SUPPORTED T-BAR ROW","ws":"4","r":"10","rpe":"RPE8","rest":"2-3 MIN","note":"BE EXPLOSIVE AT THE BOTTOM, DRIVE ELBOWS BACK HARD!","mz":{"back":1,"biceps":0.5}},{"n":"SINGLE-LEG LEG PRESS","ws":"4","r":"15","rpe":"RPE8","rest":"2-3 MIN","note":"LOW/MEDIUM/HIGH FOOT PLACEMENT, DON'T ALLOW YOUR LOWER BACK TO ROUND","mz":{"quads":1,"glutes":0.5}},{"n":"ECCENTRIC- ACCENTUATED STANDING CALF RAISE","ws":"4","r":"8","rpe":"RPE8","rest":"1-2 MIN","note":"PRESS ONTO YOUR TOES. 4-SECOND ECCENTRIC","mz":{"calves":1}},{"n":"CABLE ROPE UPRIGHT ROW","ws":"4","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING THE UPPER TRAPS AT THE TOP","mz":{"shoulders":1,"back":0.5}},{"n":"CABLE SINGLE-ARM CURL","ws":"4","r":"8","rpe":"RPE8","rest":"1-2 MIN","note":"KEEP YOUR SHOULDER JOINT HYPEREXTENDED (ELBOW BEHIND TORSO)","mz":{"biceps":1}}]},{"d":4,"focus":"LOWER FOCUSED FULL BODY 2","ex":[{"n":"[TOPSET] DEADLIFT","ws":"1","r":"2","rpe":"95%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1,"hamstrings":1,"glutes":1}},{"n":"[BACK OFF] RESET DEADLIFT","ws":"1","r":"3","rpe":"85%","rest":"3-5 MIN","note":"BRACE YOUR LATS, CHEST TALL, HIPS HIGH, PULL THE SLACK OUT OF THE BAR PRIOR TO MOVING IT OFF THE GROUND","mz":{"back":1,"hamstrings":1,"glutes":1}},{"n":"DECLINE BENCH PRESS","ws":"4","r":"8","rpe":"RPE 8","rest":"2-3 MIN","note":"CONSTANT TENSION REPS, TOUCH BAR TO CHEST","mz":{"chest":1,"triceps":0.5}},{"n":"GLUTE HAM RAISE","ws":"4","r":"10","rpe":"RPE8","rest":"1-2 MIN","note":"KEEP LOWER BACK STRAIGHT, USE HAMSTRINGS TO CURL YOUR BODY UP","mz":{"hamstrings":1,"glutes":0.5}},{"n":"LEG EXTENSION","ws":"4","r":"12","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON SQUEEZING YOUR QUADS TO MOVE THE WEIGHT","mz":{"quads":1}},{"n":"CABLE PULL-OVER","ws":"3","r":"15","rpe":"RPE8","rest":"1-3 MIN","note":"LEAN YOUR TORSO AT A 45° ANGLE, FOCUS ON PULLING THE WEIGHT STRAIGHT DOWN, NOT \"IN\"","mz":{"back":1,"chest":0.5}},{"n":"DUMBBELL LATERAL RAISE","ws":"3","r":"20","rpe":"RPE8","rest":"1-2 MIN","note":"RAISE THE DUMBBELL \"OUT\" NOT \"UP\", MIND MUSCLE CONNECTION WITH MIDDLE FIBERS","mz":{"shoulders":1}},{"n":"REVERSE PEC DECK","ws":"3","r":"20","rpe":"RPE8","rest":"1-2 MIN","note":"SWING THE WEIGHT \"OUT\", NOT \"BACK\"","mz":{"shoulders":1,"back":0.5}},{"n":"EZ BAR SKULL CRUSHER","ws":"3","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"ARC THE BAR BACK BEHIND YOUR HEAD, KEEP CONSTANT TENSION ON TRICEPS","mz":{"triceps":1}}]},{"d":5,"focus":"DELTOID FOCUSED FULL BODY","ex":[{"n":"OVERHEAD PRESS","ws":"5","r":"3","rpe":"87.5%","rest":"2-3 MIN","note":"SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, CLEAR YOUR HEAD OUT OF THE WAY, PRESS UP AND SLIGHTLY BACK","mz":{"shoulders":1,"triceps":0.5}},{"n":"CABLE LATERAL RAISE","ws":"3","r":"8","rpe":"RPE8","rest":"1-2 MIN","note":"SWING THE WEIGHT \"OUT\", NOT \"UP\"","mz":{"shoulders":1}},{"n":"PENDLAY ROW","ws":"4","r":"12","rpe":"RPE8","rest":"1-3 MIN","note":"KEEP A FLAT BACK, PULL YOUR ELBOWS BACK AT 45 DEGREE ANGLE","mz":{"back":1,"biceps":0.5}},{"n":"SEATED HIP ABDUCTION","ws":"4","r":"20","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON DRIVING YOUR KNEES OUT","mz":{"glutes":1}},{"n":"EZ BAR CURL 21S","ws":"2","r":"7/7/7","rpe":"RPE8","rest":"1-2 MIN","note":"FIRST 7 REPS BOTTOM HALF OF ROM, NEXT 7 REPS TOP HALF OF ROM, LAST 7 REPS FULL ROM","mz":{"biceps":1,"forearms":0.5}},{"n":"CABLE CRUNCH","ws":"4","r":"15","rpe":"RPE8","rest":"1-2 MIN","note":"FOCUS ON FLEXING YOUR SPINE. AVOID YANKING WITH YOUR ARMS","mz":{"abs":1}},{"n":"STANDING CALF RAISE","ws":"4","r":"12","rpe":"RPE8","rest":"1-2 MIN","note":"1-2 SECOND PAUSE AT THE BOTTOM OF EACH REP","mz":{"calves":1}},{"n":"PUSH UP","ws":"2","r":"RPE ONLY","rpe":"RPE7","rest":"1-2 MIN","note":"PERFORM AS MANY REPS AS YOU CAN TO HIT TARGET RPE","mz":{"chest":1,"triceps":0.5}}]}]}]},{"id":"builtin-strong-mama","name":"Strong Mama 8-Week Plan","createdBy":"builtin","builtin":true,"structure":"days","days":[{"d":1,"focus":"LOWER BODY A","ex":[{"n":"WARM-UP INCLINE WALK","type":"cardio","duration":"13","intensity":"RPE3-4","note":"INCLINE 5-7, 2.8-3.2 MPH, 10-15 MIN","mz":{}},{"n":"LEG PRESS","ws":"3","r":"10-12","rpe":"RPE6-7","rest":"","note":"55-70 LB","mz":{"quads":1,"glutes":0.5}},{"n":"ROMANIAN DEADLIFT","ws":"3","r":"10","rpe":"RPE6","rest":"","note":"15-20 LB KB","mz":{"hamstrings":1,"glutes":0.5}},{"n":"GLUTE BRIDGE","ws":"3","r":"12-15","rpe":"RPE6","rest":"","note":"PAUSE AT TOP","mz":{"glutes":1,"hamstrings":0.5}},{"n":"HIP ABDUCTION","ws":"3","r":"15","rpe":"RPE7","rest":"","note":"CONTROLLED","mz":{"glutes":1}},{"n":"HEEL SLIDES","ws":"2","r":"10/side","rpe":"RPE3","rest":"","note":"CORE","mz":{"abs":0.5}}]},{"d":2,"focus":"UPPER BODY A","ex":[{"n":"WARM-UP WALK","type":"cardio","duration":"10","intensity":"RPE3","note":"","mz":{}},{"n":"CHEST PRESS","ws":"3","r":"10-12","rpe":"RPE6-7","rest":"","note":"25-30 LB","mz":{"chest":1,"triceps":0.5,"shoulders":0.5}},{"n":"LAT PULLDOWN","ws":"3","r":"10-12","rpe":"RPE6-7","rest":"","note":"55-60 LB","mz":{"back":1,"biceps":0.5}},{"n":"SEATED ROW","ws":"3","r":"10-12","rpe":"RPE6-7","rest":"","note":"50-55 LB","mz":{"back":1,"biceps":0.5}},{"n":"SHOULDER PRESS","ws":"2","r":"10","rpe":"RPE6","rest":"","note":"LIGHT","mz":{"shoulders":1,"triceps":0.5}},{"n":"BICEPS CURL","ws":"2","r":"12","rpe":"RPE6","rest":"","note":"","mz":{"biceps":1}},{"n":"TRICEPS PRESSDOWN","ws":"2","r":"12","rpe":"RPE6","rest":"","note":"","mz":{"triceps":1}}]},{"d":3,"focus":"RECOVERY","ex":[{"n":"INCLINE WALK","type":"cardio","duration":"18","intensity":"RPE3","note":"15-20 MIN","mz":{}},{"n":"MOBILITY","type":"cardio","duration":"13","intensity":"RPE2","note":"10-15 MIN","mz":{}},{"n":"MASSAGE/CRYO","type":"cardio","duration":"13","intensity":"RPE1","note":"OPTIONAL, 10-15 MIN","mz":{}}]},{"d":4,"focus":"LOWER BODY B","ex":[{"n":"WARM-UP","type":"cardio","duration":"13","intensity":"RPE3","note":"10-15 MIN","mz":{}},{"n":"GOBLET SQUAT","ws":"3","r":"10","rpe":"RPE6","rest":"","note":"","mz":{"quads":1,"glutes":0.5}},{"n":"LEG PRESS","ws":"3","r":"12","rpe":"RPE7","rest":"","note":"SLIGHTLY HEAVIER","mz":{"quads":1,"glutes":0.5}},{"n":"ROMANIAN DEADLIFT","ws":"3","r":"10","rpe":"RPE7","rest":"","note":"","mz":{"hamstrings":1,"glutes":0.5}},{"n":"GLUTE BRIDGE","ws":"3","r":"15","rpe":"RPE6","rest":"","note":"","mz":{"glutes":1,"hamstrings":0.5}},{"n":"HIP ABDUCTION","ws":"3","r":"15","rpe":"RPE7","rest":"","note":"","mz":{"glutes":1}}]},{"d":5,"focus":"UPPER BODY B","ex":[{"n":"WARM-UP","type":"cardio","duration":"10","intensity":"RPE3","note":"","mz":{}},{"n":"INCLINE CHEST PRESS","ws":"3","r":"10","rpe":"RPE7","rest":"","note":"","mz":{"chest":1,"shoulders":0.5,"triceps":0.5}},{"n":"LAT PULLDOWN","ws":"3","r":"10","rpe":"RPE7","rest":"","note":"","mz":{"back":1,"biceps":0.5}},{"n":"SEATED ROW","ws":"3","r":"10","rpe":"RPE7","rest":"","note":"","mz":{"back":1,"biceps":0.5}},{"n":"LATERAL RAISE","ws":"2","r":"12","rpe":"RPE6","rest":"","note":"","mz":{"shoulders":1}},{"n":"FACE PULL","ws":"2","r":"15","rpe":"RPE6","rest":"","note":"","mz":{"shoulders":0.5,"back":0.5}}]},{"d":6,"focus":"CARDIO + CORE","ex":[{"n":"INCLINE WALK","type":"cardio","duration":"25","intensity":"RPE4","note":"20-30 MIN","mz":{}},{"n":"BIRD DOGS","ws":"2","r":"10/side","rpe":"RPE3","rest":"","note":"","mz":{"abs":1}},{"n":"PELVIC TILTS","ws":"2","r":"12","rpe":"RPE3","rest":"","note":"","mz":{"abs":1}},{"n":"DEAD BUG","ws":"2","r":"10/side","rpe":"RPE4","rest":"","note":"IF COMFORTABLE","mz":{"abs":1}}]},{"d":7,"focus":"REST","ex":[]}]}],"MUSCLE_MAP":{"AB WHEEL ROLLOUT":{"abs":1},"ARNOLD PRESS":{"shoulders":1,"triceps":0.5},"BACK SQUAT":{"quads":1,"glutes":1,"hamstrings":0.5},"BANDED CHEST- SUPPORTED T-BAR ROW":{"back":1,"biceps":0.5},"BARBELL BENCH PRESS":{"chest":1,"triceps":0.5,"shoulders":0.5},"BARBELL HIP THRUST OR ROMANIAN DEADLIFT":{"glutes":1,"hamstrings":1},"BARBELL OVERHEAD PRESS":{"shoulders":1,"triceps":0.5},"BICYCLE CRUNCH":{"abs":1},"CABLE CRUNCH":{"abs":1},"CABLE LATERAL RAISE":{"shoulders":1},"CABLE PULL-OVER":{"back":1,"chest":0.5},"CABLE ROPE UPRIGHT ROW":{"shoulders":1,"back":0.5},"CABLE SEATED ROW":{"back":1,"biceps":0.5},"CABLE SINGLE-ARM CURL":{"biceps":1},"CHEST-SUPPORTED T-BAR ROW":{"back":1,"biceps":0.5},"CHIN-UP":{"back":1,"biceps":1},"DEADLIFT":{"back":1,"hamstrings":1,"glutes":1},"DECLINE BENCH PRESS":{"chest":1,"triceps":0.5},"DIP":{"chest":1,"triceps":1},"DUMBBELL INCLINE PRESS":{"chest":1,"shoulders":0.5,"triceps":0.5},"DUMBBELL LATERAL RAISE":{"shoulders":1},"DUMBBELL ROW":{"back":1,"biceps":0.5},"ECCENTRIC- ACCENTUATED STANDING CALF RAISE":{"calves":1},"EGYPTIAN LATERAL RAISE":{"shoulders":1},"EZ BAR CURL 21S":{"biceps":1,"forearms":0.5},"EZ BAR SKULL CRUSHER":{"triceps":1},"GLUTE HAM RAISE":{"hamstrings":1,"glutes":0.5},"HAMMER CURL":{"biceps":1,"forearms":1},"HANGING LEG RAISE":{"abs":1},"HEX BAR OR SMITH MACHINE SHRUG":{"back":1,"shoulders":0.5},"HUMBLE ROW":{"back":1,"biceps":0.5},"INCLINE DUMBBELL CURL":{"biceps":1},"LEG EXTENSION":{"quads":1},"LEG PRESS":{"quads":1,"glutes":0.5},"LOW INCLINE DUMBBELL PRESS":{"chest":1,"triceps":0.5},"LOW TO HIGH CABLE FLYE":{"chest":1},"LYING LEG CURL":{"hamstrings":1},"OVERHEAD PRESS":{"shoulders":1,"triceps":0.5},"OVERHEAD TRICEP EXTENSION":{"triceps":1},"PENDLAY ROW":{"back":1,"biceps":0.5},"PRONATED PULLDOWN":{"back":1,"biceps":0.5},"PUSH UP":{"chest":1,"triceps":0.5},"RESET DEADLIFT":{"back":1,"hamstrings":1,"glutes":1},"REVERSE PEC DECK":{"shoulders":1,"back":0.5},"ROPE FACE PULL":{"shoulders":1,"back":0.5},"SEATED HIP ABDUCTION":{"glutes":1},"SINGLE-LEG LEG PRESS":{"quads":1,"glutes":0.5},"STANDING CALF RAISE":{"calves":1},"SUPINATED EZ BAR CURL":{"biceps":1},"SWISS BALL LEG CURL":{"hamstrings":1},"TRICEP PRESSDOWN":{"triceps":1},"WEIGHTED PULL-UP":{"back":1,"biceps":1},"[BACK OFF] BACK SQUAT":{"quads":1,"glutes":1,"hamstrings":0.5},"[TOPSET] BACK SQUAT":{"quads":1,"glutes":1,"hamstrings":0.5},"[BACK OFF] RESET DEADLIFT":{"back":1,"hamstrings":1,"glutes":1},"[TOPSET] DEADLIFT":{"back":1,"hamstrings":1,"glutes":1}},"ZONES":["chest","back","shoulders","biceps","triceps","quads","hamstrings","glutes","calves","abs","forearms"]};
@@ -57,20 +71,41 @@ function forgeStorageKeys() {
   }
   return keys;
 }
-function exportLocalData() {
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error("Could not read a stored scan."));
+    reader.readAsDataURL(blob);
+  });
+}
+function dataUrlToBlob(dataUrl) {
+  const [header, encoded] = String(dataUrl || "").split(",");
+  const type = header?.match(/data:(.*?);base64/)?.[1] || "application/pdf";
+  const bytes = Uint8Array.from(atob(encoded || ""), (char) => char.charCodeAt(0));
+  return new Blob([bytes], { type });
+}
+async function exportLocalData() {
   const data = {};
   forgeStorageKeys().forEach((key) => { data[key] = window.localStorage.getItem(key); });
-  const backup = { app: "the-forge", version: 1, exportedAt: new Date().toISOString(), data };
+  const storedDocuments = await listScanDocuments().catch(() => []);
+  const scanDocuments = await Promise.all(storedDocuments.map(async ({ blob, ...record }) => ({
+    ...record,
+    dataUrl: await blobToDataUrl(blob),
+  })));
+  const backup = { app: "the-forge", version: 2, exportedAt: new Date().toISOString(), data, scanDocuments };
   const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }));
   const link = document.createElement("a");
   link.href = url;
   link.download = `the-forge-backup-${todayKey()}.json`;
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
-function restoreLocalData(text) {
+async function restoreLocalData(text) {
   const backup = JSON.parse(text);
-  if (backup?.app !== "the-forge" || backup?.version !== 1 || !backup.data || typeof backup.data !== "object") {
+  if (backup?.app !== "the-forge" || ![1, 2].includes(backup?.version) || !backup.data || typeof backup.data !== "object") {
     throw new Error("This is not a valid The Forge backup.");
   }
   const entries = Object.entries(backup.data);
@@ -79,6 +114,10 @@ function restoreLocalData(text) {
   }
   forgeStorageKeys().forEach((key) => window.localStorage.removeItem(key));
   entries.forEach(([key, value]) => window.localStorage.setItem(key, value));
+  if (backup.version === 2 && Array.isArray(backup.scanDocuments)) {
+    const records = backup.scanDocuments.map(({ dataUrl, ...record }) => ({ ...record, blob: dataUrlToBlob(dataUrl) }));
+    await restoreScanDocuments(records);
+  }
 }
 
 const MEAL_SECTIONS = [
@@ -107,12 +146,13 @@ export default function App() {
     const arr = Array.isArray(saved) ? saved : [];
     const builtinIds = new Set(BUILTIN_PLANS.map((b) => b.id));
     const userPlans = arr.filter((p) => p && !p.builtin && !builtinIds.has(p.id));
-    return [...BUILTIN_PLANS, ...userPlans];
+    return [...BUILTIN_PLANS, ...userPlans].map(ensurePlanIds);
   });
 
   useEffect(() => { saveJSON("profiles", profiles); }, [profiles]);
   useEffect(() => { saveJSON("activeProfileId", activeProfileId); }, [activeProfileId]);
   useEffect(() => { saveJSON("plans", plans); }, [plans]);
+  useEffect(() => { saveJSON("schemaVersion", 2); }, []);
 
   // Self-heal: if the builtin plans are somehow missing, restore them.
   useEffect(() => {
@@ -120,7 +160,7 @@ export default function App() {
     const hasAllBuiltins = BUILTIN_PLANS.every((b) => plans.some((p) => p.id === b.id));
     if (!hasAllBuiltins) {
       const userPlans = plans.filter((p) => p && !p.builtin && !builtinIds.has(p.id));
-      setPlans([...BUILTIN_PLANS, ...userPlans]);
+      setPlans([...BUILTIN_PLANS, ...userPlans].map(ensurePlanIds));
     }
   }, [plans]);
 
@@ -209,6 +249,7 @@ function Main({ profile, profiles, setProfiles, plans, setPlans, onSwitchProfile
   const [workoutLogs, setWorkoutLogs] = useState(() => readLocal(pKey(pid, "workoutLogs"), {}));
   const [servingPrefs, setServingPrefs] = useState(() => readLocal(pKey(pid, "servingPrefs"), {}));
   const [measurements, setMeasurements] = useState(() => readLocal(pKey(pid, "measurements"), []));
+  const [bodyScans, setBodyScans] = useState(() => readLocal(pKey(pid, "bodyScans"), []));
 
   // If the active profile changes, re-read that profile's own data fresh.
   useEffect(() => {
@@ -219,6 +260,7 @@ function Main({ profile, profiles, setProfiles, plans, setPlans, onSwitchProfile
     setWorkoutLogs(readLocal(pKey(pid, "workoutLogs"), {}));
     setServingPrefs(readLocal(pKey(pid, "servingPrefs"), {}));
     setMeasurements(readLocal(pKey(pid, "measurements"), []));
+    setBodyScans(readLocal(pKey(pid, "bodyScans"), []));
   }, [pid]);
 
   useEffect(() => { saveJSON(pKey(pid, "myFoods"), myFoods); }, [myFoods, pid]);
@@ -227,6 +269,7 @@ function Main({ profile, profiles, setProfiles, plans, setPlans, onSwitchProfile
   useEffect(() => { saveJSON(pKey(pid, "workoutLogs"), workoutLogs); }, [workoutLogs, pid]);
   useEffect(() => { saveJSON(pKey(pid, "servingPrefs"), servingPrefs); }, [servingPrefs, pid]);
   useEffect(() => { saveJSON(pKey(pid, "measurements"), measurements); }, [measurements, pid]);
+  useEffect(() => { saveJSON(pKey(pid, "bodyScans"), bodyScans); }, [bodyScans, pid]);
 
   // persist target edits back onto the profile record
   function updateTargets(t) {
@@ -292,6 +335,23 @@ function Main({ profile, profiles, setProfiles, plans, setPlans, onSwitchProfile
       { ...entry, kind }
     ].sort((a, b) => a.date.localeCompare(b.date)));
   }
+  function saveBodyScan(scan) {
+    setBodyScans((prev) => [
+      ...prev.filter((item) => item.id !== scan.id && item.fingerprint !== scan.fingerprint),
+      scan,
+    ].sort((a, b) => a.scanDate.localeCompare(b.scanDate)));
+    const weightMetric = scan.metrics?.find((metric) => metric.code === "weight");
+    if (scan.scanDate && Number.isFinite(weightMetric?.value)) {
+      const pounds = Math.round(weightMetric.value * 2.2046226218 * 10) / 10;
+      setWeights((prev) => prev.some((entry) => entry.date === scan.scanDate)
+        ? prev
+        : [...prev, { date: scan.scanDate, lbs: pounds, source: "evolt", scanId: scan.id }]);
+    }
+  }
+  async function removeBodyScan(scanId) {
+    setBodyScans((prev) => prev.filter((scan) => scan.id !== scanId));
+    await deleteScanDocument(pid, scanId).catch(() => {});
+  }
 
   return (
     <div style={styles.app}>
@@ -311,7 +371,9 @@ function Main({ profile, profiles, setProfiles, plans, setPlans, onSwitchProfile
           )}
           {tab === "body" && <BodyTab workoutLogs={workoutLogs} plans={plans} profile={profile} setProfiles={setProfiles}
             weights={weights} addWeightEntry={addWeightEntry} saveGoalWeight={saveGoalWeight}
-            measurements={measurements} addMeasurementEntry={addMeasurementEntry} onGoTrain={() => setTab("train")} />}
+            measurements={measurements} addMeasurementEntry={addMeasurementEntry}
+            bodyScans={bodyScans} saveBodyScan={saveBodyScan} removeBodyScan={removeBodyScan}
+            onGoTrain={() => setTab("train")} />}
           {tab === "food" && (
             <FoodTab totals={totals} targets={targets} setTargets={updateTargets} todaysEntries={todaysEntries}
               dayLog={dayLog} copyPreviousDay={copyPreviousDay}
@@ -335,11 +397,20 @@ function TopBar({ profile, onSwitchProfile }) {
   const [showData, setShowData] = useState(false);
   const [message, setMessage] = useState("");
   const fileRef = useRef(null);
+  async function createBackup() {
+    setMessage("");
+    try {
+      await exportLocalData();
+      setMessage("Backup created, including stored body-scan PDFs.");
+    } catch (error) {
+      setMessage(error.message || "Could not create the backup.");
+    }
+  }
   async function importBackup(event) {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
-      restoreLocalData(await file.text());
+      await restoreLocalData(await file.text());
       window.location.reload();
     } catch (error) {
       setMessage(error.message || "Could not restore that backup.");
@@ -364,7 +435,7 @@ function TopBar({ profile, onSwitchProfile }) {
             <div style={styles.modalHeader}><span style={styles.modalTitle}>Your data</span><button aria-label="Close" style={styles.iconButton} onClick={() => setShowData(false)}><X size={18} color={COLORS.textDim} /></button></div>
             <div style={styles.helpNote}>Your records stay in this browser. Export a backup periodically and before clearing browser data or changing devices.</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 14 }}>
-              <button style={styles.primaryButton} onClick={exportLocalData}><Download size={15} style={{ verticalAlign: "-3px", marginRight: 6 }} />Export</button>
+              <button style={styles.primaryButton} onClick={createBackup}><Download size={15} style={{ verticalAlign: "-3px", marginRight: 6 }} />Export</button>
               <button style={styles.secondaryButton} onClick={() => fileRef.current?.click()}><Upload size={15} style={{ verticalAlign: "-3px", marginRight: 6 }} />Restore</button>
             </div>
             <input ref={fileRef} type="file" accept="application/json,.json" onChange={importBackup} hidden />
@@ -402,6 +473,14 @@ function TrainHome({ profile, plans, setPlans, setActivePlan, workoutLogs, logEx
         onSelect={(id) => { setActivePlan(id); setScreen("run"); }}
         onNew={() => { setEditingPlanId(null); setScreen("builder"); }}
         onEdit={(id) => { setEditingPlanId(id); setScreen("builder"); }}
+        onCustomize={(id) => {
+          const source = plans.find((plan) => plan.id === id);
+          if (!source) return;
+          const copy = clonePlanForProfile(source, profile.id, uid(), `${source.name} - Custom`);
+          setPlans((prev) => [...prev, copy]);
+          setEditingPlanId(copy.id);
+          setScreen("builder");
+        }}
         onDelete={(id) => setPlans((prev) => prev.filter((p) => p.id !== id))}
       />
     );
@@ -426,6 +505,7 @@ function TrainHome({ profile, plans, setPlans, setActivePlan, workoutLogs, logEx
   return (
     <ActivePlanRunner
       plan={activePlan}
+      profileId={profile.id}
       workoutLogs={workoutLogs} logExerciseSession={logExerciseSession}
       onChangePlan={() => setScreen("library")}
     />
@@ -433,7 +513,7 @@ function TrainHome({ profile, plans, setPlans, setActivePlan, workoutLogs, logEx
 }
 
 // ============ PLAN LIBRARY ============
-function PlanLibrary({ plans, activePlanId, onSelect, onNew, onEdit, onDelete }) {
+function PlanLibrary({ plans, activePlanId, onSelect, onNew, onEdit, onCustomize, onDelete }) {
   return (
     <div style={styles.tabContent}>
       <div style={styles.screenHeader}>
@@ -444,7 +524,7 @@ function PlanLibrary({ plans, activePlanId, onSelect, onNew, onEdit, onDelete })
         const dayCount = plan.structure === "weeks"
           ? (plan.weeks?.[0]?.days?.length || 0)
           : (plan.days?.length || 0);
-        const meta = plan.structure === "weeks" ? `${plan.weeks.length} weeks · ${dayCount} days/week` : `${dayCount} days`;
+        const meta = plan.structure === "weeks" ? `${plan.weeks.length} weeks · ${dayCount} days/week` : `${dayCount} ${dayCount === 1 ? "day" : "days"}`;
         const isActive = plan.id === activePlanId;
         return (
           <div key={plan.id} style={{ ...styles.planCard, borderColor: isActive ? COLORS.amber : COLORS.cardBorder }}>
@@ -455,10 +535,12 @@ function PlanLibrary({ plans, activePlanId, onSelect, onNew, onEdit, onDelete })
               </div>
             </div>
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              {!plan.builtin && (
+              {plan.builtin ? (
+                <button style={styles.iconButton} onClick={() => onCustomize(plan.id)} aria-label={`Customize ${plan.name}`} title="Customize a personal copy"><Copy size={16} color={COLORS.textDim} /></button>
+              ) : (
                 <>
-                  <button style={styles.iconButton} onClick={() => onEdit(plan.id)}><Pencil size={16} color={COLORS.textDim} /></button>
-                  <button style={styles.iconButton} onClick={() => { if (confirm(`Delete "${plan.name}"?`)) onDelete(plan.id); }}><Trash2 size={16} color={COLORS.textDim} /></button>
+                  <button style={styles.iconButton} aria-label={`Edit ${plan.name}`} onClick={() => onEdit(plan.id)}><Pencil size={16} color={COLORS.textDim} /></button>
+                  <button style={styles.iconButton} aria-label={`Delete ${plan.name}`} onClick={() => { if (confirm(`Delete "${plan.name}"?`)) onDelete(plan.id); }}><Trash2 size={16} color={COLORS.textDim} /></button>
                 </>
               )}
               <button style={isActive ? styles.activeBadgeBtn : styles.primaryButtonSm} onClick={() => onSelect(plan.id)}>
@@ -477,21 +559,55 @@ function PlanLibrary({ plans, activePlanId, onSelect, onNew, onEdit, onDelete })
 function PlanBuilder({ existing, createdBy, onCancel, onSave }) {
   const [name, setName] = useState(existing?.name || "");
   const wasWeekStructured = existing?.structure === "weeks";
-  // builder works in flat "days" structure
-  const [days, setDays] = useState(() => {
-    if (existing?.structure === "days") return existing.days.map((d) => ({ ...d, ex: d.ex.map((e) => ({ ...e })) }));
-    if (existing?.structure === "weeks") {
-      // Editing a week-based plan: only week 1 is used as a starting
-      // template, and saving converts it to a single repeating day-based
-      // plan. Weeks 2+ are NOT carried over — see the warning banner below.
-      return existing.weeks[0].days.map((d) => ({ ...d, ex: d.ex.map((e) => ({ ...e })) }));
-    }
-    return [{ d: 1, focus: "", ex: [] }];
+  const [weeks, setWeeks] = useState(() => {
+    if (existing?.structure === "weeks") return structuredClone(existing.weeks);
+    return [{
+      wk: 1,
+      blk: 1,
+      days: existing?.structure === "days"
+        ? structuredClone(existing.days)
+        : [{ d: 1, focus: "", ex: [] }],
+    }];
   });
+  const [activeWeek, setActiveWeek] = useState(0);
   const [openDay, setOpenDay] = useState(0);
+  const days = weeks[activeWeek]?.days || [];
+  function setDays(updater) {
+    setWeeks((prev) => prev.map((week, index) => index === activeWeek
+      ? { ...week, days: typeof updater === "function" ? updater(week.days || []) : updater }
+      : week));
+  }
+  function addWeek() {
+    const source = structuredClone(weeks[activeWeek] || { days: [{ d: 1, focus: "", ex: [] }] });
+    delete source.id;
+    source.wk = weeks.length + 1;
+    source.days.forEach((day) => {
+      delete day.id;
+      day.ex?.forEach((exercise) => delete exercise.id);
+    });
+    setWeeks((prev) => [...prev, source]);
+    setActiveWeek(weeks.length);
+    setOpenDay(0);
+  }
+  function removeWeek() {
+    if (weeks.length <= 1) return;
+    setWeeks((prev) => prev.filter((_, index) => index !== activeWeek).map((week, index) => ({ ...week, wk: index + 1 })));
+    setActiveWeek((index) => Math.max(0, index - 1));
+    setOpenDay(0);
+  }
 
   function addDay() { setDays((prev) => [...prev, { d: prev.length + 1, focus: "", ex: [] }]); setOpenDay(days.length); }
   function removeDay(i) { setDays((prev) => prev.filter((_, idx) => idx !== i).map((d, idx) => ({ ...d, d: idx + 1 }))); }
+  function moveDay(i, direction) {
+    setDays((prev) => {
+      const nextIndex = i + direction;
+      if (nextIndex < 0 || nextIndex >= prev.length) return prev;
+      const copy = [...prev];
+      [copy[i], copy[nextIndex]] = [copy[nextIndex], copy[i]];
+      return copy.map((day, index) => ({ ...day, d: index + 1 }));
+    });
+    setOpenDay((value) => Math.max(0, Math.min(days.length - 1, value + direction)));
+  }
   function setFocus(i, focus) { setDays((prev) => prev.map((d, idx) => idx === i ? { ...d, focus } : d)); }
   function addExercise(i) { setDays((prev) => prev.map((d, idx) => idx === i ? { ...d, ex: [...d.ex, newStrengthExercise()] } : d)); }
   function addCardio(i) { setDays((prev) => prev.map((d, idx) => idx === i ? { ...d, ex: [...d.ex, newCardioExercise()] } : d)); }
@@ -504,12 +620,22 @@ function PlanBuilder({ existing, createdBy, onCancel, onSave }) {
       ex: d.ex.map((e, j) => {
         if (j !== ei) return e;
         return type === "cardio"
-          ? { ...newCardioExercise(), n: e.n, duration: e.duration || "", intensity: e.intensity || "", note: e.note || "" }
-          : { ...newStrengthExercise(), n: e.n, ws: e.ws || "3", r: e.r || "8", rpe: e.rpe || "", rest: e.rest || "", note: e.note || "", mz: e.mz || {} };
+          ? { ...newCardioExercise(), id: e.id, n: e.n, duration: e.duration || "", intensity: e.intensity || "", note: e.note || "" }
+          : { ...newStrengthExercise(), id: e.id, n: e.n, ws: e.ws || "3", r: e.r || "8", rpe: e.rpe || "", rest: e.rest || "", note: e.note || "", mz: e.mz || {} };
       })
     } : d));
   }
   function removeExercise(di, ei) { setDays((prev) => prev.map((d, idx) => idx === di ? { ...d, ex: d.ex.filter((_, j) => j !== ei) } : d)); }
+  function moveExercise(di, ei, direction) {
+    setDays((prev) => prev.map((day, dayIndex) => {
+      if (dayIndex !== di) return day;
+      const nextIndex = ei + direction;
+      if (nextIndex < 0 || nextIndex >= day.ex.length) return day;
+      const exercises = [...day.ex];
+      [exercises[ei], exercises[nextIndex]] = [exercises[nextIndex], exercises[ei]];
+      return { ...day, ex: exercises };
+    }));
+  }
   function toggleZone(di, ei, zone) {
     setDays((prev) => prev.map((d, idx) => {
       if (idx !== di) return d;
@@ -524,25 +650,31 @@ function PlanBuilder({ existing, createdBy, onCancel, onSave }) {
 
   function save() {
     if (!name.trim()) { alert("Give the plan a name."); return; }
-    const cleanDays = days.map((d, i) => ({
-      d: i + 1,
-      focus: d.focus.trim() || `Day ${i + 1}`,
-      ex: d.ex.filter((e) => e.n.trim()).map((e) => {
-        const base = { ...e, n: e.n.trim(), type: exerciseType(e) };
-        return base.type === "cardio"
-          ? { ...base, duration: String(base.duration || "").trim(), intensity: String(base.intensity || "").trim(), mz: {} }
-          : base;
-      })
+    const cleanWeeks = weeks.map((week, weekIndex) => ({
+      ...week,
+      wk: weekIndex + 1,
+      days: (week.days || []).map((d, i) => ({
+        ...d,
+        d: i + 1,
+        focus: d.focus.trim() || `Day ${i + 1}`,
+        ex: d.ex.filter((e) => e.n.trim()).map((e) => {
+          const base = { ...e, n: e.n.trim(), type: exerciseType(e) };
+          return base.type === "cardio"
+            ? { ...base, duration: String(base.duration || "").trim(), intensity: String(base.intensity || "").trim(), mz: {} }
+            : base;
+        })
+      }))
     }));
-    if (cleanDays.every((d) => d.ex.length === 0)) { alert("Add at least one exercise."); return; }
-    const plan = {
+    if (cleanWeeks.every((week) => week.days.every((d) => d.ex.length === 0))) { alert("Add at least one exercise."); return; }
+    const multiWeek = wasWeekStructured || cleanWeeks.length > 1;
+    const plan = ensurePlanIds({
       id: existing?.id || uid(),
       name: name.trim(),
       createdBy: existing?.createdBy || createdBy,
       builtin: false,
-      structure: "days",
-      days: cleanDays,
-    };
+      structure: multiWeek ? "weeks" : "days",
+      ...(multiWeek ? { weeks: cleanWeeks } : { days: cleanWeeks[0].days }),
+    });
     onSave(plan);
   }
 
@@ -551,11 +683,16 @@ function PlanBuilder({ existing, createdBy, onCancel, onSave }) {
       <button style={styles.backRow} onClick={onCancel}><ArrowLeft size={18} /> Library</button>
       <div style={styles.screenTitle}>{existing ? "Edit Plan" : "New Plan"}</div>
       {wasWeekStructured && (
-        <div style={styles.warningBanner}>
-          This plan has multiple weeks. Editing here only keeps week 1 as a starting point — saving will turn it into a single repeating day-based plan, and weeks 2 and beyond will be discarded. Cancel now if you wanted to keep the full multi-week version.
-        </div>
+        <div style={styles.helpNote}>All {weeks.length} weeks are preserved. Changes apply to the selected week.</div>
       )}
       <input style={styles.input} placeholder="Plan name (e.g. Anna's Upper/Lower)" value={name} onChange={(e) => setName(e.target.value)} />
+      {(wasWeekStructured || weeks.length > 1) && (
+        <div style={styles.weekPicker}>
+          <button style={styles.iconButton} aria-label="Previous week" disabled={activeWeek === 0} onClick={() => { setActiveWeek((value) => Math.max(0, value - 1)); setOpenDay(0); }}><ChevronLeft size={20} /></button>
+          <div style={styles.weekLabel}>Week {activeWeek + 1} <span style={styles.dimLabel}>of {weeks.length}</span></div>
+          <button style={styles.iconButton} aria-label="Next week" disabled={activeWeek === weeks.length - 1} onClick={() => { setActiveWeek((value) => Math.min(weeks.length - 1, value + 1)); setOpenDay(0); }}><ChevronRight size={20} /></button>
+        </div>
+      )}
 
       {days.map((day, di) => {
         const strengthCount = day.ex.filter((e) => exerciseType(e) === "strength").length;
@@ -572,7 +709,11 @@ function PlanBuilder({ existing, createdBy, onCancel, onSave }) {
                 </div>
               </div>
             </div>
-            <button style={styles.iconButton} onClick={(e) => { e.stopPropagation(); removeDay(di); }}><Trash2 size={15} color={COLORS.textDim} /></button>
+            <div style={{ display: "flex" }}>
+              <button style={styles.iconButton} aria-label={`Move day ${di + 1} up`} disabled={di === 0} onClick={(e) => { e.stopPropagation(); moveDay(di, -1); }}><ChevronUp size={15} color={COLORS.textDim} /></button>
+              <button style={styles.iconButton} aria-label={`Move day ${di + 1} down`} disabled={di === days.length - 1} onClick={(e) => { e.stopPropagation(); moveDay(di, 1); }}><ChevronDown size={15} color={COLORS.textDim} /></button>
+              <button style={styles.iconButton} aria-label={`Remove day ${di + 1}`} onClick={(e) => { e.stopPropagation(); removeDay(di); }}><Trash2 size={15} color={COLORS.textDim} /></button>
+            </div>
           </div>
           {openDay === di && (
             <div style={{ marginTop: 10 }}>
@@ -586,7 +727,11 @@ function PlanBuilder({ existing, createdBy, onCancel, onSave }) {
                         {type === "cardio" ? <Timer size={13} /> : <Dumbbell size={13} />}
                         {type === "cardio" ? "Cardio" : "Strength"}
                       </span>
-                      <button style={styles.iconButtonSmall} onClick={() => removeExercise(di, ei)}><X size={15} color={COLORS.textDim} /></button>
+                      <div style={{ display: "flex", gap: 2 }}>
+                        <button style={styles.iconButtonSmall} aria-label={`Move ${ex.n || `exercise ${ei + 1}`} up`} disabled={ei === 0} onClick={() => moveExercise(di, ei, -1)}><ChevronUp size={15} color={COLORS.textDim} /></button>
+                        <button style={styles.iconButtonSmall} aria-label={`Move ${ex.n || `exercise ${ei + 1}`} down`} disabled={ei === day.ex.length - 1} onClick={() => moveExercise(di, ei, 1)}><ChevronDown size={15} color={COLORS.textDim} /></button>
+                        <button style={styles.iconButtonSmall} aria-label={`Remove ${ex.n || `exercise ${ei + 1}`}`} onClick={() => removeExercise(di, ei)}><X size={15} color={COLORS.textDim} /></button>
+                      </div>
                     </div>
                     <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                       <input style={{ ...styles.input, flex: 1 }} placeholder={type === "cardio" ? "Cardio name" : "Exercise name"} value={ex.n} onChange={(e) => updateExercise(di, ei, "n", e.target.value)} />
@@ -628,6 +773,7 @@ function PlanBuilder({ existing, createdBy, onCancel, onSave }) {
                         </div>
                       </>
                     )}
+                    <input style={{ ...styles.input, marginTop: 8 }} placeholder="Coaching notes (optional)" value={ex.note || ""} onChange={(e) => updateExercise(di, ei, "note", e.target.value)} />
                   </div>
                 );
               })}
@@ -641,6 +787,10 @@ function PlanBuilder({ existing, createdBy, onCancel, onSave }) {
       );})}
 
       <button style={styles.secondaryButton} onClick={addDay}><Plus size={15} style={{ verticalAlign: "-2px" }} /> Add day</button>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <button style={styles.secondaryButton} onClick={addWeek}><Copy size={15} style={{ verticalAlign: "-2px", marginRight: 5 }} />Duplicate week</button>
+        <button style={styles.secondaryButton} disabled={weeks.length <= 1} onClick={removeWeek}><Trash2 size={15} style={{ verticalAlign: "-2px", marginRight: 5 }} />Remove week</button>
+      </div>
       <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
         <button style={{ ...styles.primaryButton, flex: 1 }} onClick={save}>Save plan</button>
         <button style={styles.secondaryButton} onClick={onCancel}>Cancel</button>
@@ -666,31 +816,53 @@ function decorateSetsForExercise(ex, sets) {
   }));
 }
 
-function ActivePlanRunner({ plan, workoutLogs, logExerciseSession, onChangePlan }) {
-  const [view, setView] = useState("days");
-  const [selWeek, setSelWeek] = useState(0);
-  const [selDay, setSelDay] = useState(0);
-  const [selEx, setSelEx] = useState(0);
+function ActivePlanRunner({ plan, profileId, workoutLogs, logExerciseSession, onChangePlan }) {
+  const initialTarget = findNextWorkout(workoutLogs, plan, todayKey());
+  const [view, setView] = useState(() => plan ? "exlist" : "days");
+  const [selWeek, setSelWeek] = useState(initialTarget.weekIndex);
+  const [selDay, setSelDay] = useState(initialTarget.dayIndex);
+  const [selEx, setSelEx] = useState(initialTarget.exerciseIndex);
+  const [completedWorkout, setCompletedWorkout] = useState(null);
+  const [celebratedWorkouts, setCelebratedWorkouts] = useState(() => readLocal(pKey(profileId, "completedCelebrations"), []));
   const [runMode, setRunMode] = useState(() => readLocal("workoutMode", "table"));
 
   useEffect(() => { saveJSON("workoutMode", runMode); }, [runMode]);
+  useEffect(() => { saveJSON(pKey(profileId, "completedCelebrations"), celebratedWorkouts); }, [celebratedWorkouts, profileId]);
+  useEffect(() => {
+    const target = findNextWorkout(workoutLogs, plan, todayKey());
+    setSelWeek(target.weekIndex);
+    setSelDay(target.dayIndex);
+    setSelEx(target.exerciseIndex);
+    setView(target.reason === "program-complete" ? "days" : "exlist");
+  }, [plan?.id]);
 
   if (!plan) return null;
 
   const isWeekly = plan.structure === "weeks";
-  const week = isWeekly ? plan.weeks[selWeek] : null;
-  const daysList = isWeekly ? week.days : plan.days;
-  const day = daysList[selDay];
+  const weeks = planWeeks(plan);
+  const safeWeekIndex = Math.min(selWeek, Math.max(0, weeks.length - 1));
+  const week = weeks[safeWeekIndex];
+  const daysList = week?.days || [];
+  const safeDayIndex = Math.min(selDay, Math.max(0, daysList.length - 1));
+  const day = daysList[safeDayIndex];
   const ex = day?.ex[selEx];
   const wkNum = isWeekly ? week.wk : null;
+  const completionId = `${plan.id}|${week?.id || wkNum || "repeat"}|${day?.id || day?.d}|${todayKey()}`;
 
-  function dayLoggedCount(d) {
-    return d.ex.filter((e) => {
-      const log = workoutLogs[logKeyFor(plan, d.d, e.n, wkNum)];
-      return (log?.sessions || []).length > 0;
-    }).length;
+  function getExerciseLog(d, exercise, dayIndex, exerciseIndex) {
+    return logForExercise(workoutLogs, plan, week, d, exercise, safeWeekIndex, dayIndex, exerciseIndex);
   }
-  const totalLogged = daysList.reduce((sum, d) => sum + dayLoggedCount(d), 0);
+  function exerciseKey(d, exercise, dayIndex, exerciseIndex) {
+    return stableLogKey(plan, week, d, exercise, safeWeekIndex, dayIndex, exerciseIndex);
+  }
+  function dayLoggedCount(d, dayIndex) {
+    return d.ex.filter((exercise, exerciseIndex) => exerciseCompleteOnDate(
+      getExerciseLog(d, exercise, dayIndex, exerciseIndex),
+      todayKey(),
+      exercise,
+    )).length;
+  }
+  const totalLogged = daysList.reduce((sum, d, dayIndex) => sum + dayLoggedCount(d, dayIndex), 0);
   const totalExercises = daysList.reduce((sum, d) => sum + d.ex.length, 0);
 
   if (view === "days") {
@@ -711,18 +883,18 @@ function ActivePlanRunner({ plan, workoutLogs, logExerciseSession, onChangePlan 
 
         {isWeekly && (
           <div style={styles.weekPicker}>
-            <button style={styles.iconButton} disabled={selWeek === 0} onClick={() => setSelWeek((w) => Math.max(0, w - 1))}>
+            <button style={styles.iconButton} aria-label="Previous workout week" disabled={safeWeekIndex === 0} onClick={() => { setSelWeek((w) => Math.max(0, w - 1)); setSelDay(0); setSelEx(0); }}>
               <ChevronLeft size={20} color={selWeek === 0 ? COLORS.cardBorder : COLORS.text} />
             </button>
             <div style={styles.weekLabel}>Week {week.wk} <span style={styles.dimLabel}>· Block {week.blk}</span></div>
-            <button style={styles.iconButton} disabled={selWeek === plan.weeks.length - 1} onClick={() => setSelWeek((w) => Math.min(plan.weeks.length - 1, w + 1))}>
+            <button style={styles.iconButton} aria-label="Next workout week" disabled={safeWeekIndex === plan.weeks.length - 1} onClick={() => { setSelWeek((w) => Math.min(plan.weeks.length - 1, w + 1)); setSelDay(0); setSelEx(0); }}>
               <ChevronRight size={20} color={selWeek === plan.weeks.length - 1 ? COLORS.cardBorder : COLORS.text} />
             </button>
           </div>
         )}
 
         {daysList.map((d, di) => {
-          const done = dayLoggedCount(d);
+          const done = dayLoggedCount(d, di);
           const pct = d.ex.length ? Math.min(100, (done / d.ex.length) * 100) : 0;
           return (
             <button key={di} style={styles.dayCard} onClick={() => { setSelDay(di); setView("exlist"); }}>
@@ -744,7 +916,7 @@ function ActivePlanRunner({ plan, workoutLogs, logExerciseSession, onChangePlan 
   }
 
   if (view === "exlist") {
-    const dayDone = dayLoggedCount(day);
+    const dayDone = dayLoggedCount(day, safeDayIndex);
     const strengthCount = day.ex.filter((item) => exerciseType(item) === "strength").length;
     const cardioCount = day.ex.length - strengthCount;
     return (
@@ -765,17 +937,19 @@ function ActivePlanRunner({ plan, workoutLogs, logExerciseSession, onChangePlan 
         {runMode === "guided" && (
           <>
             <GuidedWorkout
-              plan={plan} day={day} wkNum={wkNum} exercises={day.ex} workoutLogs={workoutLogs}
+              plan={plan} day={day} wkNum={wkNum} exercises={day.ex}
               activeIndex={selEx} setActiveIndex={setSelEx}
-              onSaveExercise={(exercise, sets) => logExerciseSession(logKeyFor(plan, day.d, exercise.n, wkNum), decorateSetsForExercise(exercise, sets))}
+              timerKey={`${STORAGE_KEY_PREFIX}${pKey(profileId, "restTimer")}:guided`}
+              getLog={(exercise, exerciseIndex) => getExerciseLog(day, exercise, safeDayIndex, exerciseIndex)}
+              onSaveExercise={(exercise, sets, exerciseIndex) => logExerciseSession(exerciseKey(day, exercise, safeDayIndex, exerciseIndex), decorateSetsForExercise(exercise, sets))}
             />
             <QuickAddCardio onSave={(entry) => logExerciseSession(cardioLogKeyFor(plan, day.d, entry.name, wkNum), [{ type: "cardio", duration: entry.duration, intensity: entry.intensity, done: true }])} />
           </>
         )}
         {runMode === "table" && day.ex.map((e, ei) => {
-          const log = workoutLogs[logKeyFor(plan, day.d, e.n, wkNum)];
+          const log = getExerciseLog(day, e, safeDayIndex, ei);
           const last = log?.sessions?.[log.sessions.length - 1];
-          const loggedToday = (log?.sessions || []).length > 0;
+          const loggedToday = exerciseCompleteOnDate(log, todayKey(), e);
           const type = exerciseType(e);
           if (type === "cardio") {
             return (
@@ -812,6 +986,26 @@ function ActivePlanRunner({ plan, workoutLogs, logExerciseSession, onChangePlan 
             </React.Fragment>
           );
         })}
+        {day.ex.length > 0 && dayDone === day.ex.length && !celebratedWorkouts.includes(completionId) && (
+          <button style={{ ...styles.primaryButton, width: "100%" }} onClick={() => {
+            setCelebratedWorkouts((prev) => [...new Set([...prev, completionId])]);
+            setCompletedWorkout({
+              planName: plan.name,
+              dayName: `Day ${day.d}`,
+              focus: titleCase(day.focus),
+              exercises: day.ex.length,
+              completedAt: new Date().toISOString(),
+            });
+          }}><Trophy size={17} style={{ verticalAlign: "-3px", marginRight: 7 }} />Finish Workout</button>
+        )}
+        {completedWorkout && <WorkoutCompleteCelebration workout={completedWorkout} onDone={() => {
+          setCompletedWorkout(null);
+          const target = findNextWorkout(workoutLogs, plan, todayKey());
+          setSelWeek(target.weekIndex);
+          setSelDay(target.dayIndex);
+          setSelEx(target.exerciseIndex);
+          setView(target.reason === "program-complete" ? "days" : "exlist");
+        }} />}
       </div>
     );
   }
@@ -819,9 +1013,10 @@ function ActivePlanRunner({ plan, workoutLogs, logExerciseSession, onChangePlan 
   return (
     <ExerciseLogger
       plan={plan} day={day} ex={ex} wkNum={wkNum} isWeekly={isWeekly} week={week}
-      log={workoutLogs[logKeyFor(plan, day.d, ex.n, wkNum)]}
+      timerKey={`${STORAGE_KEY_PREFIX}${pKey(profileId, "restTimer")}:logger`}
+      log={getExerciseLog(day, ex, safeDayIndex, selEx)}
       onBack={() => setView("exlist")}
-      onSave={(sets) => { logExerciseSession(logKeyFor(plan, day.d, ex.n, wkNum), decorateSetsForExercise(ex, sets)); setView("exlist"); }}
+      onSave={(sets) => { logExerciseSession(exerciseKey(day, ex, safeDayIndex, selEx), decorateSetsForExercise(ex, sets)); setView("exlist"); }}
     />
   );
 }
@@ -838,6 +1033,28 @@ function formatTimer(seconds) {
   const s = Math.max(0, seconds);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
+
+function WorkoutCompleteCelebration({ workout, onDone }) {
+  return (
+    <div style={{ ...styles.modalOverlay, zIndex: 80 }} role="dialog" aria-modal="true" aria-label="Workout complete">
+      <div style={styles.completionSheet}>
+        <div aria-hidden="true" style={styles.completionBurst}>
+          <div style={styles.completionStamp}><Check size={48} strokeWidth={3} /></div>
+        </div>
+        <div style={styles.completionKicker}>Forged today</div>
+        <div style={styles.completionTitle}>Workout Complete</div>
+        <div style={styles.completionSubtitle}>{workout.focus || workout.dayName}</div>
+        <div style={styles.completionStats}>
+          <div><span style={styles.completionStatValue}>{workout.exercises}</span><span style={styles.dimLabel}>exercises</span></div>
+          <div><span style={styles.completionStatValue}>{workout.dayName}</span><span style={styles.dimLabel}>{workout.planName}</span></div>
+        </div>
+        <div style={styles.helpNote}>Effort logged. Progress secured. The next workout is ready when you are.</div>
+        <button autoFocus style={{ ...styles.primaryButton, width: "100%", marginTop: 12 }} onClick={onDone}>Done</button>
+      </div>
+    </div>
+  );
+}
+
 function parseTargetReps(reps) {
   const text = String(reps || "").toLowerCase();
   if (!text || text.includes("rpe only")) return null;
@@ -904,47 +1121,45 @@ function initialStrengthSets(ex, sessions, todaySession) {
     note: "",
   }));
 }
+function firstIncompleteSetIndex(sets) {
+  const index = (sets || []).findIndex((set) => set?.done !== true);
+  return index < 0 ? Math.max(0, (sets?.length || 1) - 1) : index;
+}
 
-function GuidedWorkout({ plan, day, wkNum, exercises, workoutLogs, activeIndex, setActiveIndex, onSaveExercise }) {
+function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveIndex, timerKey, getLog, onSaveExercise }) {
   const ex = exercises[activeIndex] || exercises[0];
   const today = todayKey();
-  const log = ex ? workoutLogs[logKeyFor(plan, day.d, ex.n, wkNum)] : null;
+  const log = ex ? getLog(ex, activeIndex) : null;
   const sessions = log?.sessions || [];
   const lastSession = sessions.filter((s) => s.date !== today).slice(-1)[0];
   const todaySession = sessions.find((s) => s.date === today);
-  const [setIndex, setSetIndex] = useState(0);
+  const [setIndex, setSetIndex] = useState(() => firstIncompleteSetIndex(todaySession?.sets));
   const [sets, setSets] = useState(() => initialStrengthSets(ex, sessions, todaySession));
   const [cardioDuration, setCardioDuration] = useState(todaySession?.sets?.[0]?.duration || ex?.duration || "");
   const [cardioIntensity, setCardioIntensity] = useState(todaySession?.sets?.[0]?.intensity || ex?.intensity || "");
   const [cardioError, setCardioError] = useState("");
-  const [restLeft, setRestLeft] = useState(0);
+  const restTimer = useDeadlineTimer(timerKey, parseRestSeconds(ex?.rest));
 
   useEffect(() => {
-    const nextLog = ex ? workoutLogs[logKeyFor(plan, day.d, ex.n, wkNum)] : null;
+    const nextLog = ex ? getLog(ex, activeIndex) : null;
     const nextSessions = nextLog?.sessions || [];
     const nextToday = nextSessions.find((s) => s.date === today);
-    setSetIndex(0);
-    setRestLeft(0);
-    setSets(initialStrengthSets(ex, nextSessions, nextToday));
+    const nextSets = initialStrengthSets(ex, nextSessions, nextToday);
+    setSetIndex(firstIncompleteSetIndex(nextSets));
+    setSets(nextSets);
     setCardioDuration(nextToday?.sets?.[0]?.duration || ex?.duration || "");
     setCardioIntensity(nextToday?.sets?.[0]?.intensity || ex?.intensity || "");
     setCardioError("");
   }, [activeIndex, day.d, ex?.duration, ex?.intensity, ex?.n, ex?.r, ex?.ws, plan, wkNum, today]);
 
-  useEffect(() => {
-    if (restLeft <= 0) return;
-    const id = window.setInterval(() => setRestLeft((s) => Math.max(0, s - 1)), 1000);
-    return () => window.clearInterval(id);
-  }, [restLeft]);
-
   if (!ex) return <div style={styles.emptyHint}>No exercises in this day.</div>;
   if (exerciseType(ex) === "cardio") {
-    const completed = (log?.sessions || []).length > 0;
+    const completed = exerciseCompleteOnDate(log, today, ex);
     const progress = `${activeIndex + 1}/${exercises.length}`;
     const saveCardio = () => {
       if (!(Number(cardioDuration) > 0)) { setCardioError("Enter cardio duration in minutes."); return; }
       setCardioError("");
-      onSaveExercise(ex, [{ type: "cardio", duration: String(cardioDuration).trim(), intensity: String(cardioIntensity || "").trim(), done: true }]);
+      onSaveExercise(ex, [{ type: "cardio", duration: String(cardioDuration).trim(), intensity: String(cardioIntensity || "").trim(), done: true }], activeIndex);
     };
     return (
       <div style={styles.guidedCard}>
@@ -979,10 +1194,10 @@ function GuidedWorkout({ plan, day, wkNum, exercises, workoutLogs, activeIndex, 
   }
 
   const current = sets[setIndex] || { weight: "", reps: "", note: "" };
-  const completed = (log?.sessions || []).length > 0;
+  const completed = exerciseCompleteOnDate(log, today, ex);
   const progress = `${activeIndex + 1}/${exercises.length}`;
   const updateCurrent = (field, val) => setSets((prev) => prev.map((s, i) => i === setIndex ? { ...s, [field]: val } : s));
-  const saveNow = (nextSets = sets) => onSaveExercise(ex, nextSets);
+  const saveNow = (nextSets = sets) => onSaveExercise(ex, nextSets, activeIndex);
   const completeSet = () => {
     const nextSets = sets.map((s, i) => {
       if (i === setIndex) return { ...s, done: true };
@@ -992,10 +1207,10 @@ function GuidedWorkout({ plan, day, wkNum, exercises, workoutLogs, activeIndex, 
     setSets(nextSets);
     saveNow(nextSets);
     if (setIndex < nextSets.length - 1) {
-      setRestLeft(parseRestSeconds(ex.rest));
+      restTimer.start(parseRestSeconds(ex.rest));
       setSetIndex((i) => i + 1);
     } else if (activeIndex < exercises.length - 1) {
-      setRestLeft(0);
+      restTimer.clear();
       setActiveIndex(activeIndex + 1);
     }
   };
@@ -1011,15 +1226,15 @@ function GuidedWorkout({ plan, day, wkNum, exercises, workoutLogs, activeIndex, 
       {lastSession && <div style={styles.exLastLine}>last: {lastSession.sets.map((s) => `${s.weight || "-"}x${s.reps || "-"}`).join("  ")}</div>}
       {ex.note && <div style={styles.exNote}>{ex.note}</div>}
 
-      {restLeft > 0 && (
+      {restTimer.active && restTimer.remaining > 0 && (
         <div style={styles.restPanel}>
           <div style={styles.cardHeader}>Rest</div>
-          <div style={styles.timerText}>{formatTimer(restLeft)}</div>
+          <div style={styles.timerText}>{formatTimer(restTimer.remaining)}</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <button style={styles.secondaryButton} onClick={() => setRestLeft(0)}>Skip Rest</button>
-            <button style={styles.secondaryButton} onClick={() => setRestLeft(parseRestSeconds(ex.rest))}>Restart</button>
-            <button style={styles.secondaryButton} onClick={() => setRestLeft((s) => s + 30)}>Extend</button>
-            <button style={styles.primaryButton} onClick={() => setRestLeft(0)}>Continue</button>
+            <button style={styles.secondaryButton} onClick={restTimer.clear}>Skip Rest</button>
+            <button style={styles.secondaryButton} onClick={() => restTimer.start(parseRestSeconds(ex.rest))}>Restart</button>
+            <button style={styles.secondaryButton} onClick={() => restTimer.extend(30)}>Extend</button>
+            <button style={styles.primaryButton} onClick={restTimer.clear}>Continue</button>
           </div>
         </div>
       )}
@@ -1143,7 +1358,7 @@ function CardioLogger({ day, ex, log, onBack, onSave }) {
   );
 }
 
-function ExerciseLogger({ plan, day, ex, wkNum, isWeekly, week, log, onBack, onSave }) {
+function ExerciseLogger({ plan, day, ex, wkNum, isWeekly, week, timerKey, log, onBack, onSave }) {
   if (exerciseType(ex) === "cardio") {
     return <CardioLogger day={day} ex={ex} log={log} onBack={onBack} onSave={onSave} />;
   }
@@ -1165,20 +1380,10 @@ function ExerciseLogger({ plan, day, ex, wkNum, isWeekly, week, log, onBack, onS
   const [showNotes, setShowNotes] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const prescribedRest = Math.max(30, (parseInt(ex.rest) || 2) * 60);
-  const [restSeconds, setRestSeconds] = useState(prescribedRest);
-  const [timerRunning, setTimerRunning] = useState(false);
+  const restTimer = useDeadlineTimer(timerKey, prescribedRest);
   const [error, setError] = useState("");
   const weightRefs = useRef([]);
   const repRefs = useRef([]);
-
-  useEffect(() => {
-    if (!timerRunning) return undefined;
-    const id = window.setInterval(() => setRestSeconds((seconds) => {
-      if (seconds <= 1) { setTimerRunning(false); return 0; }
-      return seconds - 1;
-    }), 1000);
-    return () => window.clearInterval(id);
-  }, [timerRunning]);
 
   function updateSet(i, field, val) { setSets((prev) => prev.map((s, idx) => idx === i ? { ...s, [field]: val } : s)); }
   function addSet() { setSets((prev) => [...prev, { weight: prev[prev.length - 1]?.weight || "", reps: "", note: "" }]); }
@@ -1188,7 +1393,7 @@ function ExerciseLogger({ plan, day, ex, wkNum, isWeekly, week, log, onBack, onS
     const valid = completed.length > 0 && completed.every((set) => Number(set.reps) > 0 && (set.weight === "" || isNonNegativeNumber(set.weight)));
     if (!valid) { setError("Log at least one set with positive reps and a non-negative weight."); return; }
     setError("");
-    onSave(completed);
+    onSave(completed.map((set) => ({ ...set, done: true })));
   }
 
   return (
@@ -1204,11 +1409,15 @@ function ExerciseLogger({ plan, day, ex, wkNum, isWeekly, week, log, onBack, onS
         </div>
       </div>
       <div style={{ ...styles.card, display: "flex", alignItems: "center", gap: 12 }}>
-        <Timer size={20} color={timerRunning ? COLORS.amber : COLORS.textDim} />
-        <div style={{ flex: 1 }}><div style={styles.dimLabel}>Rest timer</div><div style={{ ...styles.tabularNum, fontSize: 22 }}>{String(Math.floor(restSeconds / 60)).padStart(2, "0")}:{String(restSeconds % 60).padStart(2, "0")}</div></div>
-        <button style={styles.secondaryButton} onClick={() => setRestSeconds((s) => s + 30)}>+30</button>
-        <button style={styles.primaryButtonSm} onClick={() => restSeconds === 0 ? setRestSeconds(prescribedRest) : setTimerRunning((v) => !v)}>{timerRunning ? "Pause" : "Start"}</button>
-        <button aria-label="Reset rest timer" title="Reset timer" style={styles.iconButton} onClick={() => { setTimerRunning(false); setRestSeconds(prescribedRest); }}><History size={16} color={COLORS.textDim} /></button>
+        <Timer size={20} color={restTimer.running ? COLORS.amber : COLORS.textDim} />
+        <div style={{ flex: 1 }}><div style={styles.dimLabel}>Rest timer</div><div style={{ ...styles.tabularNum, fontSize: 22 }}>{formatTimer(restTimer.active ? restTimer.remaining : prescribedRest)}</div></div>
+        <button style={styles.secondaryButton} onClick={() => restTimer.active ? restTimer.extend(30) : restTimer.start(prescribedRest + 30)}>+30</button>
+        <button style={styles.primaryButtonSm} onClick={() => {
+          if (!restTimer.active || restTimer.remaining === 0) restTimer.start(prescribedRest);
+          else if (restTimer.running) restTimer.pause();
+          else restTimer.resume();
+        }}>{restTimer.running ? "Pause" : "Start"}</button>
+        <button aria-label="Reset rest timer" title="Reset timer" style={styles.iconButton} onClick={restTimer.reset}><History size={16} color={COLORS.textDim} /></button>
       </div>
       <div style={styles.card}>
         <div style={styles.setHeaderRow}>
@@ -1771,10 +1980,12 @@ function daysAgo(dateStr) {
 function flattenSessions(workoutLogs, plans) {
   const out = [];
   Object.entries(workoutLogs || {}).forEach(([key, val]) => {
-    const parts = key.split("|");
-    const planId = parts[0];
-    const exName = parts[parts.length - 1];
-    const zones = exerciseZones(plans, planId, exName);
+    const identity = resolveWorkoutLogIdentity(key, plans);
+    const planId = identity.planId;
+    const exName = identity.exerciseName;
+    const zones = Object.keys(identity.zones || {}).length
+      ? identity.zones
+      : exerciseZones(plans, planId, exName);
     (val.sessions || []).forEach((s) => out.push({ ...s, exName, planId, zones }));
   });
   return out;
@@ -2159,8 +2370,9 @@ function formatMeasurementValue(m) {
   return m.kind === "mass" ? `${value} ${m.unit} mass` : `${value} ${m.unit}`;
 }
 
-function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightEntry, saveGoalWeight, measurements, addMeasurementEntry, onGoTrain }) {
+function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightEntry, saveGoalWeight, measurements, addMeasurementEntry, bodyScans, saveBodyScan, removeBodyScan, onGoTrain }) {
   const [side, setSide] = useState("front");
+  const [bodyMode, setBodyMode] = useState("training");
   const [windowDays, setWindowDays] = useState(7);
   const [muscleWindowDays, setMuscleWindowDays] = useState(7);
   const [setsOpen, setSetsOpen] = useState(false);
@@ -2171,6 +2383,12 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
   const [measureKind, setMeasureKind] = useState("circumference");
   const [measureVal, setMeasureVal] = useState("");
   const [quickEdit, setQuickEdit] = useState(null);
+  const [scanView, setScanView] = useState("overview");
+  const [scanMetric, setScanMetric] = useState("body_fat_percent");
+  const [scanReview, setScanReview] = useState(null);
+  const [scanImportError, setScanImportError] = useState("");
+  const [scanImporting, setScanImporting] = useState(false);
+  const scanFileRef = useRef(null);
   const gender = profile.gender || "male";
   const heat = computeHeatmap(workoutLogs, plans, windowDays);
   const muscleHeat = computeHeatmap(workoutLogs, plans, muscleWindowDays);
@@ -2191,6 +2409,59 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
     return { part, kind, latest, prev, delta: latest && prev ? latest.value - prev.value : null };
   })).filter((m) => m.latest);
   const measureUnit = MEASUREMENT_KINDS[measureKind].unit;
+  const sortedScans = [...(bodyScans || [])].sort((a, b) => a.scanDate.localeCompare(b.scanDate));
+  const latestScan = sortedScans[sortedScans.length - 1];
+  async function chooseScanFile(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setScanImporting(true);
+    setScanImportError("");
+    try {
+      const { scan } = await parseEvoltPdf(file);
+      if (sortedScans.some((existing) => existing.fingerprint === scan.fingerprint)) {
+        throw new Error("This scan is already in your history.");
+      }
+      setScanReview({ ...scan, id: uid(), file });
+    } catch (error) {
+      setScanImportError(error.message || "Could not read that Evolt PDF.");
+    } finally {
+      setScanImporting(false);
+    }
+  }
+  async function confirmScanImport(review) {
+    setScanImporting(true);
+    setScanImportError("");
+    try {
+      const warnings = validateEvoltScan(review);
+      if (warnings.some((warning) => warning.severity === "error")) {
+        setScanReview({ ...review, warnings, confidence: "review" });
+        throw new Error("Complete the required scan values before importing.");
+      }
+      await putScanDocument(profile.id, review.id, review.file);
+      const { file, ...scan } = review;
+      saveBodyScan({ ...scan, warnings, importedAt: new Date().toISOString(), documentStored: true });
+      setScanReview(null);
+    } catch (error) {
+      setScanImportError(error.message || "The scan could not be saved.");
+    } finally {
+      setScanImporting(false);
+    }
+  }
+  async function openScanPdf(scan) {
+    const document = await getScanDocument(profile.id, scan.id);
+    if (!document?.blob) {
+      setScanImportError("The original PDF is not available on this device.");
+      return;
+    }
+    const url = URL.createObjectURL(document.blob);
+    const link = window.document.createElement("a");
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
   function logMeasurement(part, kind, rawValue) {
     if (rawValue === "" || rawValue == null) return;
     const unit = MEASUREMENT_KINDS[kind].unit;
@@ -2217,31 +2488,99 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
     <div style={styles.tabContent}>
       <div style={styles.screenTitle}>Body</div>
 
+      <div style={styles.card}>
+        <div style={styles.scanHeader}>
+          <div>
+            <div style={styles.cardHeader}>Body Composition</div>
+            <div style={styles.dimLabel}>{latestScan ? `Latest Evolt scan · ${latestScan.scanDate}` : "Import an Evolt PDF to build your scan history."}</div>
+          </div>
+          <button style={styles.primaryButtonSm} disabled={scanImporting} onClick={() => scanFileRef.current?.click()}>
+            <Upload size={14} style={{ verticalAlign: "-2px", marginRight: 5 }} />{scanImporting ? "Reading…" : "Import PDF"}
+          </button>
+          <input ref={scanFileRef} type="file" accept="application/pdf,.pdf" hidden onChange={chooseScanFile} />
+        </div>
+        {scanImportError && <div role="alert" style={{ ...styles.warningBanner, marginTop: 12, marginBottom: 0 }}>{scanImportError}</div>}
+        {sortedScans.length > 0 && (
+          <>
+            <div style={styles.compactModeSwitch}>
+              {[["overview", "Overview"], ["metric", "Metrics"], ["history", "History"]].map(([value, label]) => (
+                <button key={value} style={{ ...styles.compactModeButton, ...(scanView === value ? styles.compactModeButtonOn : {}) }} onClick={() => setScanView(value)}>{label}</button>
+              ))}
+            </div>
+            {scanView === "overview" && (
+              <>
+                <ScanChangeSummary scans={sortedScans} />
+                <BodyCompositionChart
+                  scans={sortedScans}
+                  codes={["weight", "lean_body_mass", "skeletal_muscle_mass", "body_fat_mass"]}
+                  massUnit="lb"
+                />
+              </>
+            )}
+            {scanView === "metric" && (
+              <>
+                <select style={{ ...styles.input, marginTop: 12 }} value={scanMetric} onChange={(event) => setScanMetric(event.target.value)} aria-label="Body composition metric">
+                  {Object.entries(EVOLT_METRICS).filter(([, meta]) => !meta.hidden).map(([code, meta]) => <option key={code} value={code}>{meta.label}</option>)}
+                </select>
+                <BodyCompositionChart scans={sortedScans} codes={[scanMetric]} massUnit="lb" />
+                <MetricExplanation code={scanMetric} />
+              </>
+            )}
+            {scanView === "history" && (
+              <div style={{ marginTop: 10 }}>
+                {[...sortedScans].reverse().map((scan) => {
+                  const weight = scan.metrics?.find((metric) => metric.code === "weight");
+                  const fat = scan.metrics?.find((metric) => metric.code === "body_fat_percent");
+                  return (
+                    <div key={scan.id} style={styles.scanHistoryRow}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 650 }}>{scan.scanDate}</div>
+                        <div style={styles.dimLabel}>{displayMetricValue(weight)} · {displayMetricValue(fat)} body fat</div>
+                      </div>
+                      <button style={styles.iconButton} onClick={() => openScanPdf(scan)} aria-label={`Open scan from ${scan.scanDate}`} title="Open original PDF"><Download size={16} /></button>
+                      <button style={styles.iconButton} onClick={() => { if (confirm(`Delete the scan from ${scan.scanDate}?`)) removeBodyScan(scan.id); }} aria-label={`Delete scan from ${scan.scanDate}`} title="Delete scan"><Trash2 size={16} /></button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
       <div style={styles.bodyCard}>
+        {latestScan && (
+          <div style={{ ...styles.compactModeSwitch, width: "100%", marginTop: 0, marginBottom: 8 }}>
+            <button style={{ ...styles.compactModeButton, ...(bodyMode === "training" ? styles.compactModeButtonOn : {}) }} onClick={() => setBodyMode("training")}>Training</button>
+            <button style={{ ...styles.compactModeButton, ...(bodyMode === "scan" ? styles.compactModeButtonOn : {}) }} onClick={() => setBodyMode("scan")}>Scan</button>
+          </div>
+        )}
         <div style={styles.bodyVisualWrap}>
           <div style={styles.heatmapTopControls}>
             <button type="button" style={styles.compactToggle} onClick={() => setSide(side === "front" ? "back" : "front")}>
               <span style={side === "front" ? styles.compactToggleOn : styles.compactToggleOff}>Front</span>
               <span style={side === "back" ? styles.compactToggleOn : styles.compactToggleOff}>Back</span>
             </button>
-            <select value={windowDays} onChange={(e) => setWindowDays(Number(e.target.value))} style={styles.compactSelect} aria-label="Heatmap range">
+            {bodyMode === "training" && <select value={windowDays} onChange={(e) => setWindowDays(Number(e.target.value))} style={styles.compactSelect} aria-label="Heatmap range">
               <option value={7}>7 days</option>
               <option value={30}>30 days</option>
               <option value={3650}>All time</option>
-            </select>
+            </select>}
             <button type="button" style={styles.genderToggle} onClick={() => setGender(gender === "male" ? "female" : "male")} aria-label="Switch body model">
               <span style={gender === "male" ? styles.compactToggleOn : styles.compactToggleOff}>M</span>
               <span style={gender === "female" ? styles.compactToggleOn : styles.compactToggleOff}>F</span>
             </button>
           </div>
-          <AnatomyBody gender={gender} side={side} fill={fill} intensity={intensity} />
-          <MeasurementCallouts metrics={latestMetrics} onSelectPart={startMeasurementEdit} />
+          <AnatomyBody gender={gender} side={side} fill={bodyMode === "training" ? fill : () => COLORS.blue} intensity={bodyMode === "training" ? intensity : () => 0} />
+          {bodyMode === "training"
+            ? <MeasurementCallouts metrics={latestMetrics} onSelectPart={startMeasurementEdit} />
+            : <SegmentalScanCallouts latest={latestScan} previous={sortedScans[sortedScans.length - 2]} />}
         </div>
-        <div style={styles.legendRow}>
+        {bodyMode === "training" ? <div style={styles.legendRow}>
           <span style={styles.dimLabel}>less</span>
           <div style={styles.legendBar} />
           <span style={styles.dimLabel}>more</span>
-        </div>
+        </div> : <div style={styles.helpNote}>Segmental lean and fat mass from {latestScan.scanDate}. Changes compare with the previous scan.</div>}
         {quickEdit && (
           <div style={styles.quickMeasurePanel}>
             <div style={styles.quickMeasureHeader}>
@@ -2345,6 +2684,55 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
           ))}
         </div>
       )}
+      {scanReview && <EvoltImportReview review={scanReview} setReview={setScanReview} busy={scanImporting} onCancel={() => setScanReview(null)} onConfirm={confirmScanImport} />}
+    </div>
+  );
+}
+
+const SEGMENTAL_ANCHORS = {
+  left_arm: { x: 39, y: 34, labelX: 30, labelY: 28 },
+  right_arm: { x: 61, y: 34, labelX: 70, labelY: 28 },
+  torso: { x: 50, y: 48, labelX: 66, labelY: 52 },
+  left_leg: { x: 44, y: 70, labelX: 30, labelY: 74 },
+  right_leg: { x: 56, y: 70, labelX: 70, labelY: 74 },
+};
+
+function SegmentalScanCallouts({ latest, previous }) {
+  if (!latest) return null;
+  return (
+    <div style={styles.measureCalloutLayer}>
+      {Object.entries(SEGMENTAL_ANCHORS).map(([region, anchor]) => {
+        const lean = scanMetric(latest, `${region}_lean_mass`);
+        const fat = scanMetric(latest, `${region}_fat_mass`);
+        const beforeLean = scanMetric(previous, `${region}_lean_mass`);
+        const leanDelta = lean && beforeLean ? (lean.value - beforeLean.value) * 2.2046226218 : null;
+        const alignRight = anchor.labelX < anchor.x;
+        return (
+          <div key={region}>
+            <div style={{ ...styles.measureAnchorDot, left: `${anchor.x}%`, top: `${anchor.y}%` }} />
+            <div style={{
+              ...styles.measureConnector,
+              left: `${anchor.x}%`,
+              top: `${anchor.y}%`,
+              width: `${Math.max(8, Math.abs(anchor.labelX - anchor.x))}%`,
+              transform: `rotate(${Math.atan2(anchor.labelY - anchor.y, anchor.labelX - anchor.x) * 180 / Math.PI}deg)`,
+            }} />
+            <div style={{
+              ...styles.measureCallout,
+              left: `${anchor.labelX}%`,
+              top: `${anchor.labelY}%`,
+              transform: alignRight ? "translate(-100%, -50%)" : "translate(0, -50%)",
+              textAlign: alignRight ? "right" : "left",
+              pointerEvents: "none",
+            }}>
+              <div style={styles.measureCalloutTitle}>{region.replace("_", " ")}</div>
+              <div style={styles.measureCalloutValue}>Lean {displayMetricValue(lean)}</div>
+              <div style={styles.measureCalloutValue}>Fat {displayMetricValue(fat)}</div>
+              {leanDelta != null && <div style={{ ...styles.dimLabel, color: leanDelta >= 0 ? COLORS.green : COLORS.amber }}>{leanDelta > 0 ? "+" : ""}{leanDelta.toFixed(1)} lb lean</div>}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -2398,6 +2786,164 @@ function MeasurementCallouts({ metrics, onSelectPart }) {
   );
 }
 
+const SCAN_COLORS = {
+  weight: "#24C9C3",
+  lean_body_mass: "#3C86C8",
+  skeletal_muscle_mass: "#ED4D83",
+  body_fat_mass: "#E9D72F",
+};
+
+function scanMetric(scan, code) {
+  return scan?.metrics?.find((metric) => metric.code === code) || null;
+}
+
+function chartValue(metric, massUnit) {
+  if (!metric || !Number.isFinite(metric.value)) return null;
+  return metric.unit === "kg" && massUnit === "lb" ? metric.value * 2.2046226218 : metric.value;
+}
+
+function BodyCompositionChart({ scans, codes, massUnit = "lb" }) {
+  const width = 360, height = 220, left = 38, right = 12, top = 24, bottom = 40;
+  const series = codes.map((code, index) => ({
+    code,
+    label: EVOLT_METRICS[code]?.label || code,
+    color: SCAN_COLORS[code] || [COLORS.amber, COLORS.blue, COLORS.green, COLORS.pink][index % 4],
+    points: scans.map((scan) => ({ scan, metric: scanMetric(scan, code) })).filter((point) => point.metric && Number.isFinite(chartValue(point.metric, massUnit))),
+  })).filter((item) => item.points.length);
+  const values = series.flatMap((item) => item.points.map((point) => chartValue(point.metric, massUnit)));
+  if (!values.length) return <div style={styles.emptyHint}>No values are available for this metric.</div>;
+  const rawMin = Math.min(...values), rawMax = Math.max(...values);
+  const span = Math.max(1, rawMax - rawMin);
+  const min = rawMin - span * 0.12, max = rawMax + span * 0.12;
+  const plotWidth = width - left - right, plotHeight = height - top - bottom;
+  const xFor = (index) => left + (scans.length <= 1 ? plotWidth / 2 : (index / (scans.length - 1)) * plotWidth);
+  const yFor = (value) => top + ((max - value) / (max - min)) * plotHeight;
+  const decimals = span < 5 ? 1 : 0;
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={styles.scanLegend}>
+        {series.map((item) => <span key={item.code} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><i style={{ width: 8, height: 8, borderRadius: 2, background: item.color }} />{item.label}</span>)}
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", display: "block", overflow: "visible" }} role="img" aria-label={`${series.map((item) => item.label).join(", ")} trend`}>
+        {[0, 0.5, 1].map((position) => {
+          const value = max - (max - min) * position;
+          const y = top + plotHeight * position;
+          return <g key={position}><line x1={left} x2={width - right} y1={y} y2={y} stroke={COLORS.cardBorder} strokeWidth="1" /><text x={left - 6} y={y + 3} fill={COLORS.textDim} fontSize="9" textAnchor="end">{value.toFixed(decimals)}</text></g>;
+        })}
+        {series.map((item) => {
+          const pointString = item.points.map((point) => {
+            const scanIndex = scans.findIndex((scan) => scan.id === point.scan.id);
+            return `${xFor(scanIndex)},${yFor(chartValue(point.metric, massUnit))}`;
+          }).join(" ");
+          return (
+            <g key={item.code}>
+              {item.points.length > 1 && <polyline points={pointString} fill="none" stroke={item.color} strokeWidth="2" strokeLinejoin="round" />}
+              {item.points.map((point) => {
+                const scanIndex = scans.findIndex((scan) => scan.id === point.scan.id);
+                const value = chartValue(point.metric, massUnit);
+                const x = xFor(scanIndex), y = yFor(value);
+                return <g key={`${item.code}-${point.scan.id}`}><circle cx={x} cy={y} r="4" fill={item.color} stroke={COLORS.bg} strokeWidth="2" /><text x={x} y={y - 8} fill={item.color} fontSize="9" textAnchor="middle">{value.toFixed(1)}</text></g>;
+              })}
+            </g>
+          );
+        })}
+        {scans.map((scan, index) => <text key={scan.id} x={xFor(index)} y={height - 13} fill={COLORS.textDim} fontSize="9" textAnchor="middle">{scan.scanDate.slice(5).replace("-", "/")}</text>)}
+      </svg>
+    </div>
+  );
+}
+
+function ScanChangeSummary({ scans }) {
+  if (scans.length < 2) return <div style={{ ...styles.helpNote, marginTop: 10 }}>Import another scan to unlock comparisons.</div>;
+  const previous = scans[scans.length - 2], latest = scans[scans.length - 1];
+  const codes = ["weight", "body_fat_percent", "body_fat_mass", "skeletal_muscle_mass"];
+  return (
+    <div style={styles.scanChangeGrid}>
+      {codes.map((code) => {
+        const before = scanMetric(previous, code), after = scanMetric(latest, code);
+        if (!before || !after) return null;
+        const mass = after.unit === "kg";
+        const delta = (after.value - before.value) * (mass ? 2.2046226218 : 1);
+        const unit = mass ? "lb" : after.unit;
+        return (
+          <div key={code} style={styles.scanChangeTile}>
+            <span style={styles.dimLabel}>{EVOLT_METRICS[code].label}</span>
+            <span style={{ ...styles.tabularNum, color: delta === 0 ? COLORS.textDim : delta < 0 ? COLORS.green : COLORS.amber }}>{delta > 0 ? "+" : ""}{delta.toFixed(1)} {unit}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const METRIC_EXPLANATIONS = {
+  weight: "Total measured body weight. Forge combines scan points with your more frequent manual weigh-ins.",
+  body_fat_percent: "The estimated percentage of body weight made up of fat. Compare scans taken under similar conditions.",
+  body_fat_mass: "Estimated total fat mass. This is often more useful alongside weight and abdominal circumference than by itself.",
+  lean_body_mass: "Everything other than estimated body fat, including muscle, water, protein, and mineral mass.",
+  skeletal_muscle_mass: "Estimated muscle attached to the skeleton. Hydration can influence individual readings, so emphasize the multi-scan trend.",
+  visceral_fat_area: "Estimated area of fat around the abdominal organs, reported in square centimeters.",
+  visceral_fat_level: "Evolt's unitless visceral-fat rating. Use its trend rather than comparing it to a mass value.",
+  total_body_water: "Estimated total body water. Large changes can help explain apparent movement in lean mass.",
+  abdominal_circumference: "The circumference reported by the scanner. It is stored separately from manual waist measurements.",
+};
+
+function MetricExplanation({ code }) {
+  return <div style={styles.helpNote}><strong style={{ color: COLORS.text }}>What is this?</strong> {METRIC_EXPLANATIONS[code] || `${EVOLT_METRICS[code]?.label || "This metric"} is imported directly from the Evolt report and should be interpreted as a trend across consistently performed scans.`}</div>;
+}
+
+function originalToCanonical(raw, metric) {
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return null;
+  if (metric.originalUnit === "lb") return value / 2.2046226218;
+  if (metric.originalUnit === "in") return value * 2.54;
+  return value;
+}
+
+function EvoltImportReview({ review, setReview, busy, onCancel, onConfirm }) {
+  const updateMetric = (code, rawValue) => setReview((current) => {
+    const next = {
+      ...current,
+      metrics: current.metrics.map((metric) => metric.code === code
+      ? { ...metric, originalValue: rawValue, value: originalToCanonical(rawValue, metric), correctedByUser: true, confidence: 1 }
+      : metric),
+    };
+    return { ...next, warnings: validateEvoltScan(next) };
+  });
+  const priority = ["weight", "body_fat_percent", "body_fat_mass", "lean_body_mass", "skeletal_muscle_mass", "visceral_fat_area", "visceral_fat_level", "abdominal_circumference"];
+  const ordered = [...review.metrics].sort((a, b) => {
+    const ai = priority.indexOf(a.code), bi = priority.indexOf(b.code);
+    return (ai < 0 ? 100 : ai) - (bi < 0 ? 100 : bi);
+  });
+  return (
+    <div style={{ ...styles.modalOverlay, zIndex: 90 }} role="dialog" aria-modal="true" aria-label="Review Evolt scan">
+      <div style={styles.scanReviewSheet}>
+        <div style={styles.modalHeader}>
+          <div><div style={styles.modalTitle}>Review Evolt Scan</div><div style={styles.dimLabel}>{review.scanDate} · {review.metrics.length} values recognized · {review.confidence} confidence</div></div>
+          <button style={styles.iconButton} onClick={onCancel} aria-label="Close scan review"><X size={18} /></button>
+        </div>
+        {review.warnings.length > 0 && <div style={styles.warningBanner}>Some consistency checks need review. Confirm the highlighted values against the PDF.</div>}
+        <div style={styles.scanReviewList}>
+          {ordered.map((metric) => (
+            <label key={metric.code} style={styles.scanReviewRow}>
+              <span><strong>{metric.label}</strong><small>{metric.status || metric.region?.replace("_", " ") || "recognized"}</small></span>
+              <span style={styles.scanReviewInputWrap}>
+                <input type="number" step="0.01" value={metric.originalValue} onChange={(event) => updateMetric(metric.code, event.target.value)} style={styles.scanReviewInput} />
+                <em>{metric.originalUnit}</em>
+              </span>
+            </label>
+          ))}
+        </div>
+        <div style={styles.helpNote}>The original PDF stays on this device. Imported values can be corrected here before they affect your history.</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: 8 }}>
+          <button style={styles.secondaryButton} disabled={busy} onClick={onCancel}>Cancel</button>
+          <button style={styles.primaryButton} disabled={busy} onClick={() => onConfirm(review)}>{busy ? "Saving…" : "Import Scan"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Anatomical body from embedded MIT-licensed muscle paths (react-native-body-highlighter).
 function AnatomyBody({ gender, side, fill, intensity }) {
   const key = `${gender}${side === "front" ? "Front" : "Back"}`;
@@ -2437,7 +2983,7 @@ function AnatomyBody({ gender, side, fill, intensity }) {
 
 // ============ STYLE TOKENS ============
 const COLORS = { bg: "#101214", bgLift: "#15191D", card: "#1B1F24", cardHi: "#232830", cardBorder: "#30363F", text: "#F4F1EA", textDim: "#9AA0A9", amber: "#E9A642", amberSoft: "rgba(233, 166, 66, 0.16)", blue: "#6FA8D8", pink: "#D87BA8", red: "#E5604F", green: "#64BD82" };
-const globalCss = `* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; } html { margin: 0; width: 100%; height: 100%; background: ${COLORS.bg}; overflow: hidden; overscroll-behavior: none; touch-action: pan-y; -webkit-text-size-adjust: 100%; } body { margin: 0; width: 100%; height: 100%; background: ${COLORS.bg}; overflow: hidden; overscroll-behavior: none; touch-action: pan-y; } #root { width: 100%; height: 100dvh; background: ${COLORS.bg}; overflow: hidden; } input, textarea, select { font-size: 16px; transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease; } input:focus, button:focus-visible, select:focus { outline: 2px solid ${COLORS.amber}; outline-offset: 1px; } input:focus, textarea:focus, select:focus { border-color: rgba(233,166,66,0.66) !important; box-shadow: 0 0 0 3px rgba(233,166,66,0.1); } button { transition: transform 150ms ease, background 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease, opacity 180ms ease; } button:active:not(:disabled) { transform: scale(0.975); } input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; } @keyframes tabSceneIn { from { opacity: 0; transform: translate3d(0, 10px, 0) scale(0.992); filter: blur(1px); } to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); } } @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }`;
+const globalCss = `* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; } html { margin: 0; width: 100%; height: 100%; background: ${COLORS.bg}; overflow: hidden; overscroll-behavior: none; touch-action: pan-y; -webkit-text-size-adjust: 100%; } body { margin: 0; width: 100%; height: 100%; background: ${COLORS.bg}; overflow: hidden; overscroll-behavior: none; touch-action: pan-y; } #root { width: 100%; height: 100dvh; background: ${COLORS.bg}; overflow: hidden; } input, textarea, select { font-size: 16px; transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease; } input:focus, button:focus-visible, select:focus { outline: 2px solid ${COLORS.amber}; outline-offset: 1px; } input:focus, textarea:focus, select:focus { border-color: rgba(233,166,66,0.66) !important; box-shadow: 0 0 0 3px rgba(233,166,66,0.1); } button { transition: transform 150ms ease, background 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease, opacity 180ms ease; } button:active:not(:disabled) { transform: scale(0.975); } input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; } @keyframes tabSceneIn { from { opacity: 0; transform: translate3d(0, 10px, 0) scale(0.992); filter: blur(1px); } to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); } } @keyframes forgeStamp { 0% { opacity: 0; transform: scale(0.35) rotate(-18deg); } 62% { opacity: 1; transform: scale(1.12) rotate(4deg); } 100% { opacity: 1; transform: scale(1) rotate(0); } } @keyframes forgeGlow { 0%, 100% { box-shadow: 0 0 28px rgba(233,166,66,.22); } 50% { box-shadow: 0 0 70px rgba(233,166,66,.52); } } @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }`;
 const FONT_BODY = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 const FONT_NUM = "'SF Mono', 'Roboto Mono', ui-monospace, monospace";
 
@@ -2447,6 +2993,14 @@ const styles = {
   loadingText: { color: COLORS.textDim, fontFamily: FONT_BODY },
   content: { flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch", overscrollBehaviorY: "contain", touchAction: "pan-y", paddingBottom: "calc(76px + env(safe-area-inset-bottom))", background: "linear-gradient(180deg, rgba(255,255,255,0.018), rgba(255,255,255,0) 22%)" },
   tabScene: { animation: "tabSceneIn 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both" },
+  completionSheet: { width: "min(390px, calc(100vw - 28px))", background: "radial-gradient(circle at 50% 18%, rgba(233,166,66,.2), transparent 38%), #171A1E", border: "1px solid rgba(233,166,66,.45)", borderRadius: 22, padding: "28px 22px 22px", textAlign: "center", boxShadow: "0 28px 90px rgba(0,0,0,.65)", animation: "tabSceneIn 260ms ease both" },
+  completionBurst: { display: "flex", justifyContent: "center", marginBottom: 18 },
+  completionStamp: { width: 94, height: 94, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.bg, background: `linear-gradient(145deg, #F7BE65, ${COLORS.amber})`, border: "5px double rgba(16,18,20,.72)", animation: "forgeStamp 560ms cubic-bezier(.2,.9,.2,1) both, forgeGlow 1.8s ease-in-out infinite" },
+  completionKicker: { color: COLORS.amber, fontSize: 12, fontWeight: 800, letterSpacing: ".16em", textTransform: "uppercase" },
+  completionTitle: { fontSize: 30, lineHeight: 1.08, fontWeight: 850, marginTop: 7 },
+  completionSubtitle: { color: COLORS.textDim, fontSize: 15, marginTop: 7 },
+  completionStats: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, margin: "22px 0 12px" },
+  completionStatValue: { display: "block", color: COLORS.text, fontFamily: FONT_NUM, fontSize: 19, fontWeight: 700, marginBottom: 4 },
   tabContent: { padding: "12px 14px 16px", display: "flex", flexDirection: "column", gap: 12, maxWidth: 480, margin: "0 auto" },
   tabBar: { position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: "linear-gradient(180deg, rgba(31,35,41,0.9), rgba(18,20,23,0.96))", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", borderTop: `1px solid rgba(255,255,255,0.08)`, boxShadow: "0 -14px 34px rgba(0,0,0,0.34)", padding: "8px 0 calc(14px + env(safe-area-inset-bottom))", zIndex: 30 },
   tabButton: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", background: "none", border: "none", cursor: "pointer", fontFamily: FONT_BODY, borderRadius: 12, padding: "3px 0" },
@@ -2505,6 +3059,16 @@ const styles = {
   secondaryButton: { background: "linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.008))", color: COLORS.text, border: `1px solid rgba(255,255,255,0.085)`, borderRadius: 8, padding: "9px 14px", fontSize: 14, cursor: "pointer", fontFamily: FONT_BODY },
   modalOverlay: { position: "fixed", top: 0, left: 0, right: 0, bottom: "calc(74px + env(safe-area-inset-bottom))", background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-end", zIndex: 80 },
   modalSheet: { background: `linear-gradient(180deg, ${COLORS.cardHi}, ${COLORS.card})`, border: `1px solid rgba(255,255,255,0.08)`, borderBottom: "none", borderRadius: "16px 16px 0 0", padding: "18px 18px 22px", width: "100%", maxWidth: 480, margin: "0 auto", boxSizing: "border-box", maxHeight: "calc(100dvh - 108px - env(safe-area-inset-top) - env(safe-area-inset-bottom))", overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehaviorY: "contain", touchAction: "pan-y", boxShadow: "0 -18px 46px rgba(0,0,0,0.44), inset 0 1px 0 rgba(255,255,255,0.055)" },
+  scanHeader: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
+  scanLegend: { display: "flex", flexWrap: "wrap", gap: "8px 12px", color: COLORS.textDim, fontSize: 10 },
+  scanChangeGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12 },
+  scanChangeTile: { display: "flex", flexDirection: "column", gap: 5, padding: 10, background: "rgba(255,255,255,.025)", border: `1px solid ${COLORS.cardBorder}`, borderRadius: 9 },
+  scanHistoryRow: { display: "flex", alignItems: "center", gap: 6, padding: "10px 0", borderTop: `1px solid ${COLORS.cardBorder}` },
+  scanReviewSheet: { background: `linear-gradient(180deg, ${COLORS.cardHi}, ${COLORS.card})`, border: "1px solid rgba(255,255,255,.1)", borderBottom: "none", borderRadius: "18px 18px 0 0", padding: "18px 16px 20px", width: "100%", maxWidth: 480, margin: "0 auto", maxHeight: "calc(100dvh - 94px)", display: "flex", flexDirection: "column", gap: 10, boxShadow: "0 -24px 70px rgba(0,0,0,.62)" },
+  scanReviewList: { overflowY: "auto", minHeight: 0, paddingRight: 2, borderTop: `1px solid ${COLORS.cardBorder}` },
+  scanReviewRow: { display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: `1px solid ${COLORS.cardBorder}`, fontSize: 12 },
+  scanReviewInputWrap: { display: "flex", alignItems: "center", gap: 5 },
+  scanReviewInput: { width: 78, background: COLORS.bg, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 7, padding: "7px 6px", color: COLORS.text, fontFamily: FONT_NUM, textAlign: "right" },
   modalHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
   modalTitle: { fontSize: 16, fontWeight: 600 },
   modeSwitch: { display: "flex", gap: 6, marginBottom: 14 },
