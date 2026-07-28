@@ -1,14 +1,19 @@
 import assert from "node:assert/strict";
 import {
+  bestStrengthSet,
   clonePlanForProfile,
   dayProgress,
   ensurePlanIds,
   exerciseCompleteEver,
+  exerciseLoadMode,
   findNextWorkout,
+  formatStrengthSet,
   historicalDayProgress,
   legacyLogKey,
+  LOAD_MODES,
   resolveWorkoutLogIdentity,
   stableLogKey,
+  strengthSetScore,
 } from "../src/lib/workoutLogic.js";
 import {
   createTimerState,
@@ -48,12 +53,32 @@ assert.deepEqual(resolveWorkoutLogIdentity(squatKey, [plan]), {
   planId: "plan",
   exerciseName: "Squat",
   zones: {},
+  loadMode: LOAD_MODES.EXTERNAL,
 });
 assert.deepEqual(resolveWorkoutLogIdentity(rowLegacyKey, [plan]), {
   planId: "plan",
   exerciseName: "Row",
   zones: {},
+  loadMode: LOAD_MODES.EXTERNAL,
 });
+
+const bodyweightExercise = ensurePlanIds({
+  id: "bodyweight",
+  structure: "days",
+  days: [{ d: 1, ex: [{ n: "Hanging Leg Raise" }, { n: "Dip" }, { n: "Weighted Pull-Up" }] }],
+}).days[0].ex;
+assert.equal(exerciseLoadMode(bodyweightExercise[0]), LOAD_MODES.BODYWEIGHT);
+assert.equal(exerciseLoadMode(bodyweightExercise[1]), LOAD_MODES.BODYWEIGHT);
+assert.equal(exerciseLoadMode(bodyweightExercise[2]), LOAD_MODES.ADDED);
+assert.equal(exerciseLoadMode({ n: "Dip", loadMode: LOAD_MODES.ADDED }), LOAD_MODES.ADDED);
+assert.equal(formatStrengthSet(bodyweightExercise[0], { reps: "12", weight: "0" }), "12 reps");
+assert.equal(formatStrengthSet(bodyweightExercise[2], { reps: "6", weight: "25" }), "+25×6");
+assert.equal(strengthSetScore(bodyweightExercise[0], { reps: "15" }), 15);
+assert.equal(strengthSetScore({ loadMode: LOAD_MODES.ASSISTED }, { reps: "8", weight: "40" }), -40);
+assert.equal(bestStrengthSet(bodyweightExercise[0], [
+  { date: "2026-07-01", sets: [{ reps: "10" }] },
+  { date: "2026-07-02", sets: [{ reps: "14" }] },
+]).set.reps, "14");
 
 const guidedPartial = {
   [squatKey]: { sessions: [{ date, sets: [{ reps: "8", done: true }, { reps: "8", done: false }] }] },

@@ -1,4 +1,78 @@
 export const WORKOUT_SCHEMA_VERSION = 2;
+export const LOAD_MODES = Object.freeze({
+  EXTERNAL: "external",
+  BODYWEIGHT: "bodyweight",
+  ADDED: "added",
+  ASSISTED: "assisted",
+});
+
+const VALID_LOAD_MODES = new Set(Object.values(LOAD_MODES));
+const CLEAR_BODYWEIGHT_EXERCISES = new Set([
+  "BICYCLE CRUNCH",
+  "BIRD DOGS",
+  "DEAD BUG",
+  "DIP",
+  "GLUTE BRIDGE",
+  "GLUTE HAM RAISE",
+  "HANGING LEG RAISE",
+  "HEEL SLIDES",
+  "PELVIC TILTS",
+  "PUSH UP",
+  "PUSH-UP",
+]);
+
+export function exerciseLoadMode(exercise) {
+  if (VALID_LOAD_MODES.has(exercise?.loadMode)) return exercise.loadMode;
+  const name = String(exercise?.n || "").trim().toUpperCase();
+  if (CLEAR_BODYWEIGHT_EXERCISES.has(name) || name.startsWith("BODYWEIGHT ")) {
+    return LOAD_MODES.BODYWEIGHT;
+  }
+  if (name.startsWith("WEIGHTED ")) return LOAD_MODES.ADDED;
+  if (name.startsWith("ASSISTED ")) return LOAD_MODES.ASSISTED;
+  return LOAD_MODES.EXTERNAL;
+}
+
+export function loadFieldLabel(exercise) {
+  const mode = exerciseLoadMode(exercise);
+  if (mode === LOAD_MODES.ADDED) return "Added";
+  if (mode === LOAD_MODES.ASSISTED) return "Assistance";
+  return "Weight";
+}
+
+export function formatStrengthSet(exercise, set, empty = "—") {
+  const reps = Number(set?.reps) > 0 ? String(set.reps) : empty;
+  const mode = exerciseLoadMode(exercise);
+  if (mode === LOAD_MODES.BODYWEIGHT) return `${reps} reps`;
+  const weight = set?.weight !== "" && set?.weight != null ? String(set.weight) : empty;
+  if (mode === LOAD_MODES.ADDED) return `+${weight}×${reps}`;
+  if (mode === LOAD_MODES.ASSISTED) return `${weight} assist×${reps}`;
+  return `${weight}×${reps}`;
+}
+
+export function strengthSetScore(exercise, set) {
+  const reps = Number(set?.reps);
+  if (!(reps > 0)) return null;
+  const mode = exerciseLoadMode(exercise);
+  if (mode === LOAD_MODES.BODYWEIGHT) return reps;
+  const weight = Number(set?.weight);
+  if (!(weight >= 0) || set?.weight === "") return null;
+  if (mode === LOAD_MODES.ASSISTED) return -weight;
+  return weight;
+}
+
+export function bestStrengthSet(exercise, sessions) {
+  let best = null;
+  (sessions || []).forEach((session) => {
+    (session.sets || []).forEach((set) => {
+      const score = strengthSetScore(exercise, set);
+      if (score == null) return;
+      if (!best || score > best.score || (score === best.score && Number(set.reps) > Number(best.set.reps))) {
+        best = { score, set, date: session.date };
+      }
+    });
+  });
+  return best;
+}
 
 export function stableId(...parts) {
   const input = parts.map((part) => String(part ?? "")).join("|");
@@ -71,7 +145,7 @@ export function resolveWorkoutLogIdentity(key, plans) {
       }
       if (exercise) break;
     }
-    return { planId, exerciseName, zones: exercise?.mz || {} };
+    return { planId, exerciseName, zones: exercise?.mz || {}, loadMode: exerciseLoadMode(exercise) };
   }
 
   const [, , weekId, dayId, exerciseId] = parts;
@@ -82,6 +156,7 @@ export function resolveWorkoutLogIdentity(key, plans) {
     planId,
     exerciseName: exercise?.n || exerciseId || "",
     zones: exercise?.mz || {},
+    loadMode: exerciseLoadMode(exercise),
   };
 }
 
@@ -251,6 +326,7 @@ export function ensurePlanIds(plan) {
       day.id ||= dayIdentity(copy, week, day, wi, di);
       (day.ex || []).forEach((exercise, ei) => {
         exercise.id ||= exerciseIdentity(copy, week, day, exercise, wi, di, ei);
+        if (exercise?.type !== "cardio") exercise.loadMode = exerciseLoadMode(exercise);
       });
     });
   });

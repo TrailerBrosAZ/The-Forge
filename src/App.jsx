@@ -1,16 +1,22 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Plus, Trash2, Dumbbell, UtensilsCrossed, Scale, ChevronDown, ChevronUp, X, ChevronLeft, ChevronRight, Trophy, History, Check, Library, Pencil, ArrowLeft, LayoutDashboard, PersonStanding, Settings, Download, Upload, Timer, Copy } from "lucide-react";
 import {
+  bestStrengthSet,
   clonePlanForProfile,
   ensurePlanIds,
   exerciseCompleteEver,
   exerciseCompleteOnDate,
+  exerciseLoadMode,
   findNextWorkout,
+  formatStrengthSet,
   historicalDayProgress,
+  LOAD_MODES,
+  loadFieldLabel,
   logForExercise,
   planWeeks,
   resolveWorkoutLogIdentity,
   stableLogKey,
+  strengthSetScore,
 } from "./lib/workoutLogic.js";
 import { useDeadlineTimer } from "./hooks/useDeadlineTimer.js";
 import { parseEvoltPdf, PDF_READER_BUILD } from "./lib/evoltPdf.js";
@@ -32,7 +38,7 @@ const BODY_VB = {"maleFront":"0 0 724 1448","maleBack":"724 0 724 1448","femaleF
 // against. saveJSON stays async-shaped only so call sites read naturally
 // inside useEffect; it resolves immediately either way.
 const STORAGE_KEY_PREFIX = "theforge:";
-const APP_RELEASE = "2026.07.28.2";
+const APP_RELEASE = "2026.07.28.3";
 function readLocal(key, fallback) {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY_PREFIX + key);
@@ -53,7 +59,7 @@ function todayKey() {
 function uid() { return Math.random().toString(36).slice(2, 10); }
 function titleCase(s) { return (s || "").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()); }
 function exerciseType(ex) { return ex?.type === "cardio" ? "cardio" : "strength"; }
-function newStrengthExercise() { return { type: "strength", n: "", ws: "3", r: "8", rpe: "", rest: "", note: "", mz: {} }; }
+function newStrengthExercise() { return { type: "strength", loadMode: LOAD_MODES.EXTERNAL, n: "", ws: "3", r: "8", rpe: "", rest: "", note: "", mz: {} }; }
 function newCardioExercise() { return { type: "cardio", n: "", duration: "", intensity: "", note: "", mz: {} }; }
 function cardioSummary(exOrSet) {
   const duration = exOrSet?.duration ? `${exOrSet.duration} min` : "duration open";
@@ -625,7 +631,7 @@ function PlanBuilder({ existing, createdBy, onCancel, onSave }) {
         if (j !== ei) return e;
         return type === "cardio"
           ? { ...newCardioExercise(), id: e.id, n: e.n, duration: e.duration || "", intensity: e.intensity || "", note: e.note || "" }
-          : { ...newStrengthExercise(), id: e.id, n: e.n, ws: e.ws || "3", r: e.r || "8", rpe: e.rpe || "", rest: e.rest || "", note: e.note || "", mz: e.mz || {} };
+          : { ...newStrengthExercise(), id: e.id, n: e.n, loadMode: exerciseLoadMode(e), ws: e.ws || "3", r: e.r || "8", rpe: e.rpe || "", rest: e.rest || "", note: e.note || "", mz: e.mz || {} };
       })
     } : d));
   }
@@ -760,6 +766,29 @@ function PlanBuilder({ existing, createdBy, onCancel, onSave }) {
                       </div>
                     ) : (
                       <>
+                        <div style={{ marginTop: 8 }}>
+                          <div style={styles.miniLabel}>Load tracking</div>
+                          <select
+                            aria-label={`Load tracking for ${ex.n || `exercise ${ei + 1}`}`}
+                            style={{ ...styles.miniInput, width: "100%", fontFamily: FONT_BODY }}
+                            value={exerciseLoadMode(ex)}
+                            onChange={(e) => updateExercise(di, ei, "loadMode", e.target.value)}
+                          >
+                            <option value={LOAD_MODES.EXTERNAL}>External weight</option>
+                            <option value={LOAD_MODES.BODYWEIGHT}>Bodyweight only</option>
+                            <option value={LOAD_MODES.ADDED}>Bodyweight + added weight</option>
+                            <option value={LOAD_MODES.ASSISTED}>Assisted bodyweight</option>
+                          </select>
+                          <div style={{ ...styles.helpNote, marginTop: 5 }}>
+                            {exerciseLoadMode(ex) === LOAD_MODES.BODYWEIGHT
+                              ? "Log reps only. Weight is intentionally omitted."
+                              : exerciseLoadMode(ex) === LOAD_MODES.ADDED
+                                ? "Log only the weight added to your body."
+                                : exerciseLoadMode(ex) === LOAD_MODES.ASSISTED
+                                  ? "Log the assistance shown by the machine or band."
+                                  : "Log the external weight used."}
+                          </div>
+                        </div>
                         <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                           {[["ws", "Sets"], ["r", "Reps"], ["rpe", "RPE"], ["rest", "Rest"]].map(([field, label]) => (
                             <div key={field} style={{ flex: 1, minWidth: 0 }}>
@@ -996,7 +1025,7 @@ function ActivePlanRunner({ plan, profileId, workoutLogs, logExerciseSession, on
                   <span style={styles.exerciseTypePill}><Dumbbell size={12} />Strength</span>
                 </div>
                 <div style={styles.exCardMeta}>{e.ws} × {e.r}{e.rpe ? ` @ ${e.rpe}` : ""}{e.rest ? ` · ${e.rest.toLowerCase()}` : ""}</div>
-                {last && <div style={styles.exLastLine}>last: {last.sets.map((s) => `${s.weight || "—"}×${s.reps || "—"}`).join("  ")}</div>}
+                {last && <div style={styles.exLastLine}>last: {last.sets.map((s) => formatStrengthSet(e, s)).join("  ")}</div>}
               </div>
               <ChevronRight size={18} color={COLORS.textDim} />
             </button>
@@ -1106,6 +1135,7 @@ function roundSuggestedWeight(weight, exName) {
   return formatSuggestedWeight(Math.max(0, rounded));
 }
 function suggestExerciseWeight(ex, sessions, setIndex = 0) {
+  if (exerciseLoadMode(ex) === LOAD_MODES.BODYWEIGHT) return "";
   const targetReps = parseTargetReps(ex?.r);
   if (!targetReps) return "";
   const targetRpe = parseTargetRpe(ex?.rpe);
@@ -1156,6 +1186,7 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
   const [cardioDuration, setCardioDuration] = useState(todaySession?.sets?.[0]?.duration || ex?.duration || "");
   const [cardioIntensity, setCardioIntensity] = useState(todaySession?.sets?.[0]?.intensity || ex?.intensity || "");
   const [cardioError, setCardioError] = useState("");
+  const [strengthError, setStrengthError] = useState("");
   const restTimer = useDeadlineTimer(timerKey, parseRestSeconds(ex?.rest));
 
   useEffect(() => {
@@ -1168,7 +1199,8 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
     setCardioDuration(nextToday?.sets?.[0]?.duration || ex?.duration || "");
     setCardioIntensity(nextToday?.sets?.[0]?.intensity || ex?.intensity || "");
     setCardioError("");
-  }, [activeIndex, day.d, ex?.duration, ex?.intensity, ex?.n, ex?.r, ex?.ws, plan, wkNum, today]);
+    setStrengthError("");
+  }, [activeIndex, day.d, ex?.duration, ex?.intensity, ex?.loadMode, ex?.n, ex?.r, ex?.ws, plan, wkNum, today]);
 
   if (!ex) return <div style={styles.emptyHint}>No exercises in this day.</div>;
   if (exerciseType(ex) === "cardio") {
@@ -1212,11 +1244,22 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
   }
 
   const current = sets[setIndex] || { weight: "", reps: "", note: "" };
+  const loadMode = exerciseLoadMode(ex);
+  const tracksLoad = loadMode !== LOAD_MODES.BODYWEIGHT;
   const completed = exerciseCompleteOnDate(log, today, ex);
   const progress = `${activeIndex + 1}/${exercises.length}`;
   const updateCurrent = (field, val) => setSets((prev) => prev.map((s, i) => i === setIndex ? { ...s, [field]: val } : s));
   const saveNow = (nextSets = sets) => onSaveExercise(ex, nextSets, activeIndex);
   const completeSet = () => {
+    if (!(Number(current.reps) > 0)) {
+      setStrengthError("Enter positive reps before completing this set.");
+      return;
+    }
+    if (tracksLoad && current.weight !== "" && !isNonNegativeNumber(current.weight)) {
+      setStrengthError(`Enter a non-negative ${loadFieldLabel(ex).toLowerCase()}.`);
+      return;
+    }
+    setStrengthError("");
     const nextSets = sets.map((s, i) => {
       if (i === setIndex) return { ...s, done: true };
       if (i === setIndex + 1) return { ...s, weight: s.weight || current.weight, reps: s.reps || ex.r || current.reps };
@@ -1241,7 +1284,7 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
       </div>
       <div style={styles.exTitle}>{titleCase(ex.n)}</div>
       <div style={styles.exPrescription}>{ex.ws} sets x {ex.r} reps{ex.rpe ? ` @ ${ex.rpe}` : ""}</div>
-      {lastSession && <div style={styles.exLastLine}>last: {lastSession.sets.map((s) => `${s.weight || "-"}x${s.reps || "-"}`).join("  ")}</div>}
+      {lastSession && <div style={styles.exLastLine}>last: {lastSession.sets.map((s) => formatStrengthSet(ex, s, "-")).join("  ")}</div>}
       {ex.note && <div style={styles.exNote}>{ex.note}</div>}
 
       {restTimer.active && restTimer.remaining > 0 && (
@@ -1259,16 +1302,18 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
 
       <div style={styles.guidedSetBox}>
         <div style={styles.cardHeader}>Set {setIndex + 1} of {sets.length}</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <div>
-            <label style={styles.fieldLabel}>Weight</label>
-            <input style={styles.setInput} type="number" inputMode="decimal" value={current.weight} placeholder={lastSession?.sets[setIndex]?.weight || "lbs"} onChange={(e) => updateCurrent("weight", e.target.value)} />
-          </div>
+        <div style={{ display: "grid", gridTemplateColumns: tracksLoad ? "1fr 1fr" : "1fr", gap: 10 }}>
+          {tracksLoad && <div>
+            <label style={styles.fieldLabel}>{loadFieldLabel(ex)}</label>
+            <input style={styles.setInput} type="number" min="0" inputMode="decimal" value={current.weight} placeholder={lastSession?.sets[setIndex]?.weight || "lbs"} onChange={(e) => updateCurrent("weight", e.target.value)} />
+          </div>}
           <div>
             <label style={styles.fieldLabel}>Reps</label>
             <input style={styles.setInput} type="number" inputMode="numeric" value={current.reps} placeholder={ex.r} onChange={(e) => updateCurrent("reps", e.target.value)} />
           </div>
         </div>
+        {loadMode === LOAD_MODES.BODYWEIGHT && <div style={{ ...styles.helpNote, marginTop: 8 }}>Bodyweight exercise — only reps are tracked.</div>}
+        {strengthError && <div role="alert" style={{ ...styles.dimLabel, color: COLORS.red, marginTop: 10 }}>{strengthError}</div>}
         <button style={{ ...styles.primaryButton, width: "100%", marginTop: 12 }} onClick={completeSet}>Complete Set</button>
       </div>
 
@@ -1386,11 +1431,9 @@ function ExerciseLogger({ plan, day, ex, wkNum, isWeekly, week, timerKey, log, o
   const lastSession = sessions.filter((s) => s.date !== today).slice(-1)[0];
   const todaySession = sessions.find((s) => s.date === today);
 
-  let pr = null;
-  sessions.forEach((s) => s.sets.forEach((st) => {
-    const w = parseFloat(st.weight);
-    if (!isNaN(w) && (pr === null || w > pr.weight)) pr = { weight: w, reps: st.reps, date: s.date };
-  }));
+  const loadMode = exerciseLoadMode(ex);
+  const tracksLoad = loadMode !== LOAD_MODES.BODYWEIGHT;
+  const pr = bestStrengthSet(ex, sessions);
 
   const initSets = initialStrengthSets(ex, sessions, todaySession);
 
@@ -1404,12 +1447,12 @@ function ExerciseLogger({ plan, day, ex, wkNum, isWeekly, week, timerKey, log, o
   const repRefs = useRef([]);
 
   function updateSet(i, field, val) { setSets((prev) => prev.map((s, idx) => idx === i ? { ...s, [field]: val } : s)); }
-  function addSet() { setSets((prev) => [...prev, { weight: prev[prev.length - 1]?.weight || "", reps: "", note: "" }]); }
+  function addSet() { setSets((prev) => [...prev, { weight: tracksLoad ? (prev[prev.length - 1]?.weight || "") : "", reps: "", note: "" }]); }
   function removeSet(i) { setSets((prev) => prev.filter((_, idx) => idx !== i)); }
   function saveSession() {
-    const completed = sets.filter((set) => set.reps !== "" || set.weight !== "");
-    const valid = completed.length > 0 && completed.every((set) => Number(set.reps) > 0 && (set.weight === "" || isNonNegativeNumber(set.weight)));
-    if (!valid) { setError("Log at least one set with positive reps and a non-negative weight."); return; }
+    const completed = sets.filter((set) => set.reps !== "" || (tracksLoad && set.weight !== ""));
+    const valid = completed.length > 0 && completed.every((set) => Number(set.reps) > 0 && (!tracksLoad || set.weight === "" || isNonNegativeNumber(set.weight)));
+    if (!valid) { setError(tracksLoad ? `Log positive reps and a non-negative ${loadFieldLabel(ex).toLowerCase()}.` : "Log at least one set with positive reps."); return; }
     setError("");
     onSave(completed.map((set) => ({ ...set, done: true })));
   }
@@ -1422,8 +1465,8 @@ function ExerciseLogger({ plan, day, ex, wkNum, isWeekly, week, timerKey, log, o
         <div style={styles.exPrescription}>{ex.ws} working sets × {ex.r} reps{ex.rpe ? ` @ ${ex.rpe}` : ""}{ex.rest ? <span style={styles.dimLabel}> · rest {ex.rest.toLowerCase()}</span> : null}</div>
         {ex.note && <div style={styles.exNote}>{ex.note}</div>}
         <div style={styles.refRow}>
-          {lastSession && <div style={styles.refChip}><History size={13} /> Last: {lastSession.sets.map((s) => `${s.weight || "—"}×${s.reps || "—"}`).join(" ")}</div>}
-          {pr && <div style={{ ...styles.refChip, color: COLORS.amber, borderColor: COLORS.amber }}><Trophy size={13} /> PR: {pr.weight}×{pr.reps}</div>}
+          {lastSession && <div style={styles.refChip}><History size={13} /> Last: {lastSession.sets.map((s) => formatStrengthSet(ex, s)).join(" ")}</div>}
+          {pr && <div style={{ ...styles.refChip, color: COLORS.amber, borderColor: COLORS.amber }}><Trophy size={13} /> Best: {formatStrengthSet(ex, pr.set)}</div>}
         </div>
       </div>
       <div style={{ ...styles.card, display: "flex", alignItems: "center", gap: 12 }}>
@@ -1440,7 +1483,7 @@ function ExerciseLogger({ plan, day, ex, wkNum, isWeekly, week, timerKey, log, o
       <div style={styles.card}>
         <div style={styles.setHeaderRow}>
           <span style={{ ...styles.setCol, flex: "0 0 28px", color: COLORS.textDim }}>Set</span>
-          <span style={{ ...styles.setCol, color: COLORS.textDim }}>Weight</span>
+          {tracksLoad && <span style={{ ...styles.setCol, color: COLORS.textDim }}>{loadFieldLabel(ex)}</span>}
           <span style={{ ...styles.setCol, color: COLORS.textDim }}>Reps</span>
           <span style={{ flex: "0 0 32px" }} />
         </div>
@@ -1448,8 +1491,8 @@ function ExerciseLogger({ plan, day, ex, wkNum, isWeekly, week, timerKey, log, o
           <div key={i}>
             <div style={styles.setRow}>
               <span style={{ ...styles.setCol, flex: "0 0 28px", fontFamily: FONT_NUM, color: COLORS.textDim }}>{i + 1}</span>
-              <input ref={(el) => weightRefs.current[i] = el} style={styles.setInput} type="number" min="0" inputMode="decimal" placeholder={lastSession?.sets[i]?.weight || "lbs"} value={s.weight} onChange={(e) => updateSet(i, "weight", e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") repRefs.current[i]?.focus(); }} onBlur={() => { if (s.weight && !s.reps) repRefs.current[i]?.focus(); }} />
-              <input ref={(el) => repRefs.current[i] = el} style={styles.setInput} type="number" min="1" inputMode="numeric" placeholder={ex.r} value={s.reps} onChange={(e) => updateSet(i, "reps", e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") weightRefs.current[i + 1]?.focus(); }} onBlur={() => { if (s.reps) weightRefs.current[i + 1]?.focus(); }} />
+              {tracksLoad && <input ref={(el) => weightRefs.current[i] = el} style={styles.setInput} type="number" min="0" inputMode="decimal" placeholder={lastSession?.sets[i]?.weight || "lbs"} value={s.weight} onChange={(e) => updateSet(i, "weight", e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") repRefs.current[i]?.focus(); }} onBlur={() => { if (s.weight && !s.reps) repRefs.current[i]?.focus(); }} />}
+              <input ref={(el) => repRefs.current[i] = el} style={styles.setInput} type="number" min="1" inputMode="numeric" placeholder={ex.r} value={s.reps} onChange={(e) => updateSet(i, "reps", e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") tracksLoad ? weightRefs.current[i + 1]?.focus() : repRefs.current[i + 1]?.focus(); }} onBlur={() => { if (s.reps) tracksLoad ? weightRefs.current[i + 1]?.focus() : repRefs.current[i + 1]?.focus(); }} />
               <button style={styles.iconButton} onClick={() => removeSet(i)}><Trash2 size={14} color={COLORS.textDim} /></button>
             </div>
             {showNotes && <input style={styles.noteInput} placeholder="note (optional)" value={s.note} onChange={(e) => updateSet(i, "note", e.target.value)} />}
@@ -1459,6 +1502,7 @@ function ExerciseLogger({ plan, day, ex, wkNum, isWeekly, week, timerKey, log, o
           <button style={styles.secondaryButton} onClick={addSet}><Plus size={14} style={{ verticalAlign: "-2px" }} /> Set</button>
           <button style={styles.secondaryButton} onClick={() => setShowNotes((v) => !v)}>{showNotes ? "Hide notes" : "Notes"}</button>
         </div>
+        {loadMode === LOAD_MODES.BODYWEIGHT && <div style={{ ...styles.helpNote, marginTop: 8 }}>Bodyweight exercise — only reps are tracked.</div>}
         {error && <div role="alert" style={{ ...styles.dimLabel, color: COLORS.red, marginTop: 10 }}>{error}</div>}
         <button style={{ ...styles.primaryButton, width: "100%", marginTop: 12 }} onClick={saveSession}>{todaySession ? "Update session" : "Save session"}</button>
       </div>
@@ -1469,7 +1513,7 @@ function ExerciseLogger({ plan, day, ex, wkNum, isWeekly, week, timerKey, log, o
             {showHistory ? <ChevronUp size={16} color={COLORS.textDim} /> : <ChevronDown size={16} color={COLORS.textDim} />}
           </div>
           {showHistory && <div style={{ marginTop: 8 }}>{sessions.slice().reverse().map((s, i) => (
-            <div key={i} style={styles.histRow}><span style={styles.dimLabel}>{s.date}</span><span style={{ fontFamily: FONT_NUM, fontSize: 13 }}>{s.sets.map((st) => `${st.weight || "—"}×${st.reps || "—"}`).join("  ")}</span></div>
+            <div key={i} style={styles.histRow}><span style={styles.dimLabel}>{s.date}</span><span style={{ fontFamily: FONT_NUM, fontSize: 13 }}>{s.sets.map((st) => formatStrengthSet(ex, st)).join("  ")}</span></div>
           ))}</div>}
         </div>
       )}
@@ -2004,7 +2048,7 @@ function flattenSessions(workoutLogs, plans) {
     const zones = Object.keys(identity.zones || {}).length
       ? identity.zones
       : exerciseZones(plans, planId, exName);
-    (val.sessions || []).forEach((s) => out.push({ ...s, exName, planId, zones }));
+    (val.sessions || []).forEach((s) => out.push({ ...s, exName, planId, zones, loadMode: identity.loadMode }));
   });
   return out;
 }
@@ -2016,6 +2060,7 @@ function exerciseZones(plans, planId, exName) {
   return scan(plan.days) || {};
 }
 function sessionVolume(s) {
+  if (s.loadMode === LOAD_MODES.BODYWEIGHT || s.loadMode === LOAD_MODES.ASSISTED) return 0;
   return (s.sets || []).reduce((sum, st) => sum + (parseFloat(st.weight) || 0) * (parseInt(st.reps) || 0), 0);
 }
 function dayTotals(entries) {
@@ -2045,10 +2090,12 @@ function computeStats({ profile, weights, workoutLogs, dayLog, plans, targets })
   let recentPRs = 0, lastPRname = "";
   const byEx = {};
   sessions.slice().sort((a, b) => a.date.localeCompare(b.date)).forEach((s) => {
-    const maxThis = Math.max(0, ...(s.sets || []).map((st) => parseFloat(st.weight) || 0));
-    const prev = byEx[s.exName] || 0;
-    if (maxThis > prev && prev > 0 && daysAgo(s.date) < 7) { recentPRs++; lastPRname = titleCase(s.exName); }
-    byEx[s.exName] = Math.max(prev, maxThis);
+    const scores = (s.sets || []).map((st) => strengthSetScore({ loadMode: s.loadMode }, st)).filter((score) => score != null);
+    if (!scores.length) return;
+    const maxThis = Math.max(...scores);
+    const prev = byEx[s.exName];
+    if (prev != null && maxThis > prev && daysAgo(s.date) < 7) { recentPRs++; lastPRname = titleCase(s.exName); }
+    byEx[s.exName] = prev == null ? maxThis : Math.max(prev, maxThis);
   });
 
   // top lift gain (Back Squat-ish): pick exercise with most sessions, compare first vs best
@@ -2056,7 +2103,7 @@ function computeStats({ profile, weights, workoutLogs, dayLog, plans, targets })
   const exSessions = {};
   sessions.forEach((s) => { (exSessions[s.exName] = exSessions[s.exName] || []).push(s); });
   Object.entries(exSessions).forEach(([name, ss]) => {
-    if (ss.length < 2) return;
+    if (ss.length < 2 || ss[0].loadMode === LOAD_MODES.BODYWEIGHT || ss[0].loadMode === LOAD_MODES.ASSISTED) return;
     const sorted = ss.slice().sort((a, b) => a.date.localeCompare(b.date));
     const first = Math.max(0, ...(sorted[0].sets || []).map((st) => parseFloat(st.weight) || 0));
     const best = Math.max(...sorted.flatMap((s) => (s.sets || []).map((st) => parseFloat(st.weight) || 0)));
