@@ -32,7 +32,7 @@ const BODY_VB = {"maleFront":"0 0 724 1448","maleBack":"724 0 724 1448","femaleF
 // against. saveJSON stays async-shaped only so call sites read naturally
 // inside useEffect; it resolves immediately either way.
 const STORAGE_KEY_PREFIX = "theforge:";
-const APP_RELEASE = "2026.07.28.1";
+const APP_RELEASE = "2026.07.28.2";
 function readLocal(key, fallback) {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY_PREFIX + key);
@@ -1054,7 +1054,7 @@ function formatTimer(seconds) {
 
 function WorkoutCompleteCelebration({ workout, onDone }) {
   return (
-    <div style={{ ...styles.modalOverlay, zIndex: 80 }} role="dialog" aria-modal="true" aria-label="Workout complete">
+    <div style={{ ...styles.modalOverlay, justifyContent: "center", zIndex: 80 }} role="dialog" aria-modal="true" aria-label="Workout complete">
       <div style={styles.completionSheet}>
         <div aria-hidden="true" style={styles.completionBurst}>
           <div style={styles.completionStamp}><Check size={48} strokeWidth={3} /></div>
