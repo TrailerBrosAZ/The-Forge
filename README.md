@@ -8,7 +8,7 @@ Records stay in each browser's local storage. Use **Settings > Export** inside t
 
 ## Food imports
 
-The Food tab keeps manual entry, recent foods, saved foods, recipes, and serving preferences in the existing local data model. Optional barcode lookups use the free Open Food Facts API only when the user submits a barcode. Results must be reviewed before they can be logged or saved.
+The Food tab keeps manual entry, recent foods, saved foods, recipes, and serving preferences in the existing local data model. UPC/EAN barcodes can be entered manually or read locally from a camera/photo using ZXing. The photo is not uploaded; only the detected barcode number is sent to the free Open Food Facts API for an explicit product lookup. Results must be reviewed before they can be logged or saved.
 
 Nutrition-label photos are read on-device with locally hosted Tesseract.js assets. Photos and recognized text are not uploaded or retained. OCR results are deliberately editable and require a food name because label recognition can misread serving sizes or numbers. Manual entry remains available if OCR or the external barcode database cannot provide a usable result.
 
