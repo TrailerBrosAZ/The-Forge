@@ -1,4 +1,4 @@
-const CACHE_NAME = "the-forge-v9";
+const CACHE_NAME = "the-forge-v10";
 const APP_SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", (event) => {

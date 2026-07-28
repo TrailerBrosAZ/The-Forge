@@ -23,6 +23,11 @@ import {
   resumeTimerState,
 } from "../src/lib/deadlineTimer.js";
 import { parseEvoltPageItems } from "../src/lib/evoltParser.js";
+import {
+  foodFromOpenFoodFacts,
+  normalizeBarcode,
+  parseNutritionLabelText,
+} from "../src/lib/nutritionImport.js";
 
 const plan = ensurePlanIds({
   id: "plan",
@@ -110,6 +115,40 @@ assert.equal(paused.pausedRemaining, 60);
 const resumed = resumeTimerState(paused, 100_000);
 assert.equal(remainingSeconds(resumed.endAt, 130_000), 30);
 assert.equal(remainingSeconds(extendTimerState(resumed, 30, 130_000).endAt, 130_000), 60);
+
+const labelFood = parseNutritionLabelText(`
+Nutrition Facts
+Serving size 1 cup (226g)
+Calories 180
+Total Fat 5g
+Total Carbohydrate 8g
+Protein 24g
+`);
+assert.equal(labelFood.servingNote, "1 cup (226g)");
+assert.equal(labelFood.calories, 180);
+assert.equal(labelFood.fat, 5);
+assert.equal(labelFood.carbs, 8);
+assert.equal(labelFood.protein, 24);
+assert.equal(parseNutritionLabelText("Serving size 1 cup (559g)\nCalories 100\nTotal Fat 2g").warnings.some((warning) => warning.includes("serving-size")), true);
+assert.equal(normalizeBarcode("0 12345-67890 5"), "012345678905");
+assert.equal(normalizeBarcode("123"), "");
+
+const openFood = foodFromOpenFoodFacts({
+  product_name: "Cottage Cheese",
+  brands: "Forge Foods",
+  serving_size: "1/2 cup (113 g)",
+  serving_quantity: 113,
+  nutriments: {
+    "energy-kcal_100g": 90,
+    proteins_100g: 12,
+    carbohydrates_100g: 4,
+    fat_100g: 2.5,
+  },
+}, "012345678905");
+assert.equal(openFood.name, "Forge Foods Cottage Cheese");
+assert.equal(openFood.calories, 101.7);
+assert.equal(openFood.protein, 13.6);
+assert.equal(openFood.barcode, "012345678905");
 
 const pdfItems = [
   { text: "YOUR EVOLT 360 BODY SCAN", x: 190, y: 809 },
