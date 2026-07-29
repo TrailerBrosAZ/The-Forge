@@ -1,0 +1,27 @@
+:root {
+  --forge-bg-0: #0d0f11;
+  --forge-bg-1: #15191d;
+  --forge-surface-1: #1b1f24;
+  --forge-surface-2: #232830;
+  --forge-surface-raised: #282e36;
+  --forge-border-subtle: rgba(255, 255, 255, 0.075);
+  --forge-border-strong: #3a424d;
+  --forge-text-primary: #f4f1ea;
+  --forge-text-secondary: #b6bbc3;
+  --forge-text-muted: #8e959f;
+  --forge-amber: #e9a642;
+  --forge-blue: #6fa8d8;
+  --forge-pink: #d87ba8;
+  --forge-green: #64bd82;
+  --forge-red: #e5604f;
+  --forge-space-1: 4px;
+  --forge-space-2: 8px;
+  --forge-space-3: 12px;
+  --forge-space-4: 16px;
+  --forge-space-5: 20px;
+  --forge-space-6: 24px;
+  --forge-radius-control: 8px;
+  --forge-radius-surface: 12px;
+  --forge-radius-feature: 16px;
+  --forge-shadow-raised: 0 20px 48px rgba(0, 0, 0, 0.38);
+}

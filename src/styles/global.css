@@ -1,0 +1,48 @@
+.forge-section {
+  display: grid;
+  gap: var(--forge-space-3);
+}
+
+.forge-section-title {
+  color: var(--forge-text-primary);
+  font-size: 15px;
+  font-weight: 720;
+  letter-spacing: -0.01em;
+}
+
+.forge-section-kicker {
+  color: var(--forge-text-muted);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.forge-surface {
+  background: var(--forge-surface-1);
+  border: 1px solid var(--forge-border-subtle);
+  border-radius: var(--forge-radius-surface);
+}
+
+.forge-metric-number {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.035em;
+}
+
+.forge-chart-summary {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 340px) {
+  .forge-compact-hide {
+    display: none !important;
+  }
+}

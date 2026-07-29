@@ -1,10 +1,65 @@
-export const WORKOUT_SCHEMA_VERSION = 2;
+export const WORKOUT_SCHEMA_VERSION = 3;
 export const LOAD_MODES = Object.freeze({
   EXTERNAL: "external",
   BODYWEIGHT: "bodyweight",
   ADDED: "added",
   ASSISTED: "assisted",
 });
+export const SET_KINDS = Object.freeze({
+  WORKING: "working",
+  WARMUP: "warmup",
+  DROP: "drop",
+  AMRAP: "amrap",
+  TIMED: "timed",
+});
+const VALID_SET_KINDS = new Set(Object.values(SET_KINDS));
+const VALID_GROUP_TYPES = new Set(["superset", "circuit"]);
+
+export function normalizeSetKind(set) {
+  return VALID_SET_KINDS.has(set?.kind) ? set.kind : SET_KINDS.WORKING;
+}
+
+export function dropSetPrescription(exercise) {
+  const advanced = exercise?.advancedSets?.drop;
+  const repParts = String(exercise?.r || "").split("/").map((part) => part.trim()).filter(Boolean);
+  const inferred = /\bdrop\s*set\b/i.test(String(exercise?.note || "")) && repParts.length >= 2;
+  if (!advanced && !inferred) return null;
+  return {
+    workingReps: String(advanced?.workingReps || repParts[0] || exercise?.r || ""),
+    dropReps: String(advanced?.reps || repParts[1] || repParts[0] || exercise?.r || ""),
+    ratio: Number(advanced?.loadRatio) > 0 ? Number(advanced.loadRatio) : 0.5,
+  };
+}
+
+export function setClusterKey(set, index) {
+  return set?.clusterId || set?.setId || `row-${index}`;
+}
+
+export function completedWorkingSetCount(sets = [], explicitDone = true) {
+  const groups = new Map();
+  sets.forEach((set, index) => {
+    if (normalizeSetKind(set) === SET_KINDS.WARMUP) return;
+    const key = setClusterKey(set, index);
+    const rows = groups.get(key) || [];
+    rows.push(set);
+    groups.set(key, rows);
+  });
+  return [...groups.values()].filter((rows) => rows.every((set) => (
+    explicitDone ? set?.done === true : Number(set?.reps) > 0 || Number(set?.durationSeconds) > 0
+  ))).length;
+}
+
+export function groupIndices(exercises = [], exerciseIndex) {
+  const groupId = exercises[exerciseIndex]?.groupId;
+  if (!groupId) return [exerciseIndex];
+  return exercises.map((exercise, index) => exercise?.groupId === groupId ? index : -1).filter((index) => index >= 0);
+}
+
+export function exerciseGroupLabel(exercises = [], exerciseIndex) {
+  const indices = groupIndices(exercises, exerciseIndex);
+  if (indices.length < 2) return "";
+  return `A${indices.indexOf(exerciseIndex) + 1}`;
+}
 
 const VALID_LOAD_MODES = new Set(Object.values(LOAD_MODES));
 const CLEAR_BODYWEIGHT_EXERCISES = new Set([
@@ -50,6 +105,8 @@ export function formatStrengthSet(exercise, set, empty = "—") {
 }
 
 export function strengthSetScore(exercise, set) {
+  const kind = normalizeSetKind(set);
+  if (kind === SET_KINDS.WARMUP || kind === SET_KINDS.DROP || kind === SET_KINDS.TIMED) return null;
   const reps = Number(set?.reps);
   if (!(reps > 0)) return null;
   const mode = exerciseLoadMode(exercise);
@@ -181,10 +238,10 @@ export function exerciseCompleteOnDate(log, date, exercise) {
   const hasGuidedState = strengthSets.some((set) => typeof set?.done === "boolean");
   if (!hasGuidedState) {
     // Historical and list-mode sessions predate explicit per-set completion.
-    return strengthSets.some((set) => Number(set?.reps) > 0);
+    return strengthSets.some((set) => Number(set?.reps) > 0 || Number(set?.durationSeconds) > 0);
   }
   const targetSets = Math.max(1, parseInt(exercise?.ws, 10) || strengthSets.length || 1);
-  return strengthSets.filter((set) => set?.done === true).length >= targetSets;
+  return completedWorkingSetCount(strengthSets, true) >= targetSets;
 }
 
 export function exerciseCompleteEver(log, exercise) {
@@ -327,6 +384,12 @@ export function ensurePlanIds(plan) {
       (day.ex || []).forEach((exercise, ei) => {
         exercise.id ||= exerciseIdentity(copy, week, day, exercise, wi, di, ei);
         if (exercise?.type !== "cardio") exercise.loadMode = exerciseLoadMode(exercise);
+        if (!exercise.groupId || !VALID_GROUP_TYPES.has(exercise.groupType)) {
+          delete exercise.groupId;
+          delete exercise.groupType;
+          delete exercise.groupPosition;
+          delete exercise.groupRest;
+        }
       });
     });
   });

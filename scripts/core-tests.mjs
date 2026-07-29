@@ -2,16 +2,20 @@ import assert from "node:assert/strict";
 import {
   bestStrengthSet,
   clonePlanForProfile,
+  completedWorkingSetCount,
   dayProgress,
+  dropSetPrescription,
   ensurePlanIds,
   exerciseCompleteEver,
   exerciseLoadMode,
+  exerciseGroupLabel,
   findNextWorkout,
   formatStrengthSet,
   historicalDayProgress,
   legacyLogKey,
   LOAD_MODES,
   resolveWorkoutLogIdentity,
+  SET_KINDS,
   stableLogKey,
   strengthSetScore,
 } from "../src/lib/workoutLogic.js";
@@ -28,6 +32,11 @@ import {
   normalizeBarcode,
   parseNutritionLabelText,
 } from "../src/lib/nutritionImport.js";
+import { completeProfileSetup, normalizeProfilePreferences, profileSetupComplete, validateTargets } from "../src/lib/profileSetup.js";
+import { copyMealIntoDay, rankFoodSuggestions } from "../src/lib/foodHistory.js";
+import { csvCell, rowsToCsv, workoutCsvRows } from "../src/lib/csvExport.js";
+import { createBackupObject, inspectBackupText, summarizeStoredData, validateBackupObject } from "../src/lib/backup.js";
+import { consistencyMatrix, exerciseProgression, recompositionSeries, scanComparison, weeklyCrossDomain, weeklyForgeBrief } from "../src/lib/insights.js";
 
 const plan = ensurePlanIds({
   id: "plan",
@@ -78,6 +87,68 @@ assert.equal(exerciseLoadMode(bodyweightExercise[2]), LOAD_MODES.ADDED);
 assert.equal(exerciseLoadMode({ n: "Dip", loadMode: LOAD_MODES.ADDED }), LOAD_MODES.ADDED);
 assert.equal(formatStrengthSet(bodyweightExercise[0], { reps: "12", weight: "0" }), "12 reps");
 assert.equal(formatStrengthSet(bodyweightExercise[2], { reps: "6", weight: "25" }), "+25×6");
+
+const curlDrop = { n: "Supinated EZ Bar Curl", ws: "3", r: "15/15", note: "DROPSET. DROP WEIGHT BY ~50% ON SECOND 15 REPS." };
+assert.deepEqual(dropSetPrescription(curlDrop), { workingReps: "15", dropReps: "15", ratio: 0.5 });
+const clusteredSets = [
+  { kind: SET_KINDS.WORKING, clusterId: "c1", segmentIndex: 0, weight: "40", reps: "15", done: true },
+  { kind: SET_KINDS.DROP, clusterId: "c1", segmentIndex: 1, weight: "20", reps: "15", done: true },
+  { kind: SET_KINDS.WORKING, clusterId: "c2", segmentIndex: 0, weight: "40", reps: "15", done: true },
+  { kind: SET_KINDS.DROP, clusterId: "c2", segmentIndex: 1, weight: "20", reps: "15", done: false },
+  { kind: SET_KINDS.WARMUP, weight: "15", reps: "10", done: true },
+];
+assert.equal(completedWorkingSetCount(clusteredSets), 1);
+assert.equal(strengthSetScore(curlDrop, clusteredSets[0]), 40);
+assert.equal(strengthSetScore(curlDrop, clusteredSets[1]), null);
+const groupedExercises = [{ n: "Curl", groupId: "g", groupType: "superset" }, { n: "Pressdown", groupId: "g", groupType: "superset" }];
+assert.equal(exerciseGroupLabel(groupedExercises, 0), "A1");
+assert.equal(exerciseGroupLabel(groupedExercises, 1), "A2");
+const advancedPlan = ensurePlanIds({ id: "advanced", structure: "days", days: [{ d: 1, ex: groupedExercises }] });
+assert.equal(advancedPlan.schemaVersion, 3);
+assert.equal(advancedPlan.days[0].ex[0].groupId, "g");
+assert.equal(advancedPlan.days[0].ex.every((exercise) => Boolean(exercise.id)), true);
+
+const normalizedPreferences = normalizeProfilePreferences({ units: { weight: "kg", measurement: "cm" }, bodyModel: "female", primaryGoal: "gain" });
+assert.equal(normalizedPreferences.units.weight, "kg");
+assert.equal(normalizedPreferences.bodyModel, "female");
+assert.equal(validateTargets({ calories: 2200, protein: 150, carbs: 220, fat: 70 }), true);
+assert.equal(validateTargets({ calories: 0, protein: 150, carbs: 220, fat: 70 }), false);
+const configuredProfile = completeProfileSetup({ id: "p1", name: "Alex" }, normalizedPreferences);
+assert.equal(profileSetupComplete(configuredProfile), true);
+
+const mealHistory = {
+  "2026-07-26": { breakfast: [{ id: "old", name: "Cottage Cheese", calories: 100, protein: 12, carbs: 4, fat: 2 }] },
+  "2026-07-27": { breakfast: [{ id: "newer", name: "Cottage Cheese", calories: 100, protein: 12, carbs: 4, fat: 2 }] },
+};
+const suggestions = rankFoodSuggestions({ dayLog: mealHistory, targetMeal: "breakfast", todayKey: "2026-07-28" });
+assert.equal(suggestions[0].name, "Cottage Cheese");
+assert.match(suggestions[0].suggestionReason, /Often at breakfast/);
+const copiedHistory = copyMealIntoDay({ dayLog: mealHistory, sourceDate: "2026-07-27", targetDate: "2026-07-28", meal: "breakfast", createId: () => "copy" });
+assert.equal(copiedHistory["2026-07-28"].breakfast[0].id, "copy");
+assert.notEqual(copiedHistory["2026-07-28"].breakfast[0], mealHistory["2026-07-27"].breakfast[0]);
+
+assert.equal(csvCell("plain"), "plain");
+assert.equal(csvCell("a,b"), "\"a,b\"");
+assert.equal(csvCell("=SUM(A1:A2)"), "'=SUM(A1:A2)");
+assert.equal(rowsToCsv(["name", "value"], [{ name: "Squat", value: 100 }]), "\uFEFFname,value\r\nSquat,100");
+const workoutRows = workoutCsvRows({ profile: { name: "Alex" }, plans: [plan], workoutLogs: logs, resolveIdentity: resolveWorkoutLogIdentity });
+assert.equal(workoutRows.find((row) => row.exercise === "Squat").week, 1);
+assert.equal(workoutRows.find((row) => row.exercise === "Squat").day, 1);
+
+const storedData = {
+  "theforge:profiles": JSON.stringify([{ id: "p1", name: "Alex" }]),
+  "theforge:p1:workoutLogs": JSON.stringify({ squat: { sessions: [{ date: "2026-07-28", sets: [] }] } }),
+  "theforge:p1:dayLog": JSON.stringify({ "2026-07-28": { breakfast: [{ name: "Eggs" }] } }),
+};
+const backupSummary = summarizeStoredData(storedData, [{ key: "p1:scan" }]);
+assert.equal(backupSummary.workoutSessions, 1);
+assert.equal(backupSummary.foodEntries, 1);
+assert.equal(backupSummary.scanDocuments, 1);
+const backupFixture = createBackupObject({ appRelease: "test", data: storedData, scanDocuments: [], exportedAt: "2026-07-28T12:00:00.000Z" });
+assert.equal(inspectBackupText(JSON.stringify(backupFixture)).summary.profiles, 1);
+assert.equal(validateBackupObject({ ...backupFixture, version: 1 }).version, 1);
+assert.equal(validateBackupObject({ ...backupFixture, version: 2 }).version, 2);
+assert.throws(() => validateBackupObject({ ...backupFixture, data: { unsafe: "{}" } }), /invalid data/);
 assert.equal(strengthSetScore(bodyweightExercise[0], { reps: "15" }), 15);
 assert.equal(strengthSetScore({ loadMode: LOAD_MODES.ASSISTED }, { reps: "8", weight: "40" }), -40);
 assert.equal(bestStrengthSet(bodyweightExercise[0], [
@@ -178,6 +249,35 @@ assert.equal(parsedScan.scanDate, "2026-07-18");
 assert.equal(parsedScan.metrics.find((metric) => metric.code === "weight").originalUnit, "lb");
 assert.ok(Math.abs(parsedScan.metrics.find((metric) => metric.code === "weight").value - 90.7185) < 0.001);
 assert.equal(parsedScan.warnings.length, 0);
+
+const insightLogs = {
+  lift: { sessions: [
+    { date: "2026-07-20", sets: [{ kind: SET_KINDS.WARMUP, weight: 40, reps: 10 }, { kind: SET_KINDS.WORKING, weight: 100, reps: 8 }, { kind: SET_KINDS.DROP, weight: 50, reps: 12 }] },
+    { date: "2026-07-27", sets: [{ kind: SET_KINDS.WORKING, weight: 105, reps: 8 }] },
+  ] },
+};
+const insightFood = {
+  "2026-07-27": { breakfast: [{ calories: 2000, protein: 160 }] },
+  "2026-07-28": { dinner: [{ calories: 2100, protein: 170 }] },
+};
+const insightTargets = { calories: 2000, protein: 160 };
+const brief = weeklyForgeBrief({ workoutLogs: insightLogs, dayLog: insightFood, weights: [{ date: "2026-07-27", lbs: 200 }, { date: "2026-07-29", lbs: 199.5 }], targets: insightTargets, today: "2026-07-29" });
+assert.equal(brief.training.workouts, 1);
+assert.equal(brief.training.workingSets, 1);
+assert.equal(brief.nutrition.proteinHits, 2);
+assert.equal(consistencyMatrix({ workoutLogs: insightLogs, dayLog: insightFood, weights: [], targets: insightTargets, today: "2026-07-29" }).filter((day) => day.protein).length, 2);
+const progression = exerciseProgression(insightLogs.lift.sessions);
+assert.equal(progression[0].heaviest, 100);
+assert.equal(Math.round(progression[1].e1rm), 133);
+assert.equal(progression[0].volume, 800);
+const scansForInsights = [
+  { id: "scan-a", scanDate: "2026-06-01", metrics: [{ code: "weight", value: 90, unit: "kg" }, { code: "lean_body_mass", value: 65, unit: "kg" }, { code: "body_fat_mass", value: 25, unit: "kg" }, { code: "body_fat_percent", value: 27.8, unit: "%" }] },
+  { id: "scan-b", scanDate: "2026-07-01", metrics: [{ code: "weight", value: 89, unit: "kg" }, { code: "lean_body_mass", value: 66, unit: "kg" }, { code: "body_fat_mass", value: 23, unit: "kg" }, { code: "body_fat_percent", value: 25.8, unit: "%" }] },
+];
+assert.equal(recompositionSeries([{ date: "2026-06-15", lbs: 197 }], scansForInsights).length, 3);
+const comparison = scanComparison(scansForInsights[0], scansForInsights[1]);
+assert.ok(Math.abs(comparison.find((item) => item.code === "lean_body_mass").delta - 2.2046) < 0.001);
+assert.equal(weeklyCrossDomain({ workoutLogs: insightLogs, dayLog: insightFood, weights: [], targets: insightTargets, today: "2026-07-29" }).qualified, false);
 
 // Exercise the Safari-compatible PDF bundle with modern APIs deliberately absent.
 Promise.withResolvers = undefined;

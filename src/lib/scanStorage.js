@@ -70,3 +70,21 @@ export async function restoreScanDocuments(records) {
   });
   db.close();
 }
+
+export async function replaceScanDocuments(records = []) {
+  if (!Array.isArray(records)) throw new Error("Scan document replacement requires an array.");
+  const db = await openDatabase();
+  try {
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      const store = tx.objectStore(STORE);
+      store.clear();
+      records.forEach((record) => store.put(record));
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error || new Error("Could not replace scan documents."));
+      tx.onabort = () => reject(tx.error || new Error("Scan document replacement was cancelled."));
+    });
+  } finally {
+    db.close();
+  }
+}

@@ -25,8 +25,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run core tests
+        run: npm test
+
       - name: Build production assets
         run: npm run build
+
+      - name: Install browser test runtime
+        run: npx playwright install --with-deps chromium
+
+      - name: Run mobile browser smoke tests
+        run: npm run test:browser
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

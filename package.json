@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node scripts/core-tests.mjs"
+    "test": "node scripts/core-tests.mjs",
+    "test:browser": "playwright test"
   },
   "dependencies": {
     "@tesseract.js-data/eng": "^1.0.0",
@@ -20,6 +21,7 @@
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
     "@vitejs/plugin-react": "^6.0.2",
     "vite": "^8.0.16"
   }
