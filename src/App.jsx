@@ -1231,7 +1231,14 @@ function ActivePlanRunner({ plan, profileId, workoutLogs, logExerciseSession, on
   const completionId = `${plan.id}|${week?.id || wkNum || "repeat"}|${day?.id || day?.d}|${todayKey()}`;
 
   function getExerciseLog(d, exercise, dayIndex, exerciseIndex) {
-    return logForExercise(workoutLogs, plan, week, d, exercise, safeWeekIndex, dayIndex, exerciseIndex);
+    const currentLog = logForExercise(workoutLogs, plan, week, d, exercise, safeWeekIndex, dayIndex, exerciseIndex);
+    const exerciseName = String(exercise?.n || "").trim().toUpperCase();
+    const historicalSessions = Object.entries(workoutLogs || {}).flatMap(([key, value]) => {
+      const identity = resolveWorkoutLogIdentity(key, [plan]);
+      if (identity.planId !== plan.id || String(identity.exerciseName || "").trim().toUpperCase() !== exerciseName) return [];
+      return (value?.sessions || []).map((session) => ({ ...session, loadMode: identity.loadMode }));
+    }).sort((a, b) => a.date.localeCompare(b.date));
+    return { ...(currentLog || { sessions: [] }), historicalSessions };
   }
   function exerciseKey(d, exercise, dayIndex, exerciseIndex) {
     return stableLogKey(plan, week, d, exercise, safeWeekIndex, dayIndex, exerciseIndex);
@@ -1530,7 +1537,8 @@ function roundSuggestedWeight(weight, exName) {
   return formatSuggestedWeight(Math.max(0, rounded));
 }
 function suggestExerciseWeight(ex, sessions, setIndex = 0) {
-  if (exerciseLoadMode(ex) === LOAD_MODES.BODYWEIGHT) return "";
+  const mode = exerciseLoadMode(ex);
+  if (mode === LOAD_MODES.BODYWEIGHT) return "";
   const targetReps = parseTargetReps(ex?.r);
   if (!targetReps) return "";
   const targetRpe = parseTargetRpe(ex?.rpe);
@@ -1539,6 +1547,8 @@ function suggestExerciseWeight(ex, sessions, setIndex = 0) {
   prior.forEach((session, sessionIndex) => {
     (session.sets || []).forEach((set, idx) => {
       if (set.type === "cardio" || set.kind === SET_KINDS.WARMUP || set.kind === SET_KINDS.DROP || set.kind === SET_KINDS.TIMED) return;
+      const historicalMode = set.loadMode || session.loadMode || mode;
+      if (historicalMode !== mode) return;
       const weight = Number(set.weight);
       const reps = Number(set.reps);
       if (!(weight > 0) || !(reps > 0)) return;
@@ -1620,10 +1630,13 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
   const today = todayKey();
   const log = ex ? getLog(ex, activeIndex) : null;
   const sessions = log?.sessions || [];
+  const historicalSessions = log?.historicalSessions || sessions;
   const lastSession = sessions.filter((s) => s.date !== today).slice(-1)[0];
   const todaySession = sessions.find((s) => s.date === today);
   const [setIndex, setSetIndex] = useState(() => firstIncompleteSetIndex(todaySession?.sets));
-  const [sets, setSets] = useState(() => initialStrengthSets(ex, sessions, todaySession));
+  const [loadMode, setLoadMode] = useState(() => todaySession?.sets?.[0]?.loadMode || exerciseLoadMode(ex));
+  const effectiveExercise = { ...ex, loadMode };
+  const [sets, setSets] = useState(() => initialStrengthSets(effectiveExercise, historicalSessions, todaySession));
   const [cardioDuration, setCardioDuration] = useState(todaySession?.sets?.[0]?.duration || ex?.duration || "");
   const [cardioIntensity, setCardioIntensity] = useState(todaySession?.sets?.[0]?.intensity || ex?.intensity || "");
   const [cardioError, setCardioError] = useState("");
@@ -1634,7 +1647,10 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
     const nextLog = ex ? getLog(ex, activeIndex) : null;
     const nextSessions = nextLog?.sessions || [];
     const nextToday = nextSessions.find((s) => s.date === today);
-    const nextSets = initialStrengthSets(ex, nextSessions, nextToday);
+    const nextMode = nextToday?.sets?.[0]?.loadMode || exerciseLoadMode(ex);
+    const nextHistory = nextLog?.historicalSessions || nextSessions;
+    setLoadMode(nextMode);
+    const nextSets = initialStrengthSets({ ...ex, loadMode: nextMode }, nextHistory, nextToday);
     setSetIndex(firstIncompleteSetIndex(nextSets));
     setSets(nextSets);
     setCardioDuration(nextToday?.sets?.[0]?.duration || ex?.duration || "");
@@ -1685,7 +1701,6 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
   }
 
   const current = sets[setIndex] || { weight: "", reps: "", note: "" };
-  const loadMode = exerciseLoadMode(ex);
   const tracksLoad = loadMode !== LOAD_MODES.BODYWEIGHT;
   const completed = exerciseCompleteOnDate(log, today, ex);
   const progress = `${activeIndex + 1}/${exercises.length}`;
@@ -1696,7 +1711,16 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
     }
     return s;
   }));
-  const saveNow = (nextSets = sets) => onSaveExercise(ex, nextSets, activeIndex);
+  const saveNow = (nextSets = sets) => onSaveExercise(effectiveExercise, nextSets.map((set) => ({ ...set, loadMode })), activeIndex);
+  const changeLoadMode = (nextMode) => {
+    setLoadMode(nextMode);
+    setStrengthError("");
+    setSets((previous) => previous.map((set, index) => ({
+      ...set,
+      loadMode: nextMode,
+      weight: nextMode === LOAD_MODES.BODYWEIGHT ? "" : suggestExerciseWeight({ ...ex, loadMode: nextMode }, historicalSessions, index),
+    })));
+  };
   const completeSet = () => {
     if (!(Number(current.reps) > 0)) {
       setStrengthError("Enter positive reps before completing this set.");
@@ -1792,10 +1816,11 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
 
       <div style={styles.guidedSetBox}>
         <div style={styles.cardHeader}>Set {setDisplayLabel(sets, setIndex)} · {setKindLabel(current)}</div>
+        <LoadModeSelector value={loadMode} onChange={changeLoadMode} />
         <div style={{ display: "grid", gridTemplateColumns: tracksLoad ? "1fr 1fr" : "1fr", gap: 10 }}>
           {tracksLoad && <div>
-            <label style={styles.fieldLabel}>{loadFieldLabel(ex)}</label>
-            <input style={styles.setInput} type="number" min="0" inputMode="decimal" value={current.weight} placeholder={lastSession?.sets[setIndex]?.weight || "lbs"} onChange={(e) => updateCurrent("weight", e.target.value)} />
+            <label style={styles.fieldLabel}>{loadFieldLabel(effectiveExercise)}</label>
+            <input style={styles.setInput} type="number" min="0" inputMode="decimal" value={current.weight} placeholder={suggestExerciseWeight(effectiveExercise, historicalSessions, setIndex) || lastSession?.sets[setIndex]?.weight || "lbs"} onChange={(e) => updateCurrent("weight", e.target.value)} />
           </div>}
           <div>
             <label style={styles.fieldLabel}>Reps</label>
@@ -2413,6 +2438,18 @@ function AddFoodModal({ sectionLabel, myFoods, recentFoods, suggestedFoods, dele
       </div>
     </div>
   );
+}
+
+function LoadModeSelector({ value, onChange }) {
+  const options = [
+    [LOAD_MODES.EXTERNAL, "Weight"],
+    [LOAD_MODES.BODYWEIGHT, "Bodyweight"],
+    [LOAD_MODES.ADDED, "+ Weight"],
+    [LOAD_MODES.ASSISTED, "Assisted"],
+  ];
+  return <div style={styles.loadModeSelector} aria-label="Load type">
+    {options.map(([mode, label]) => <button key={mode} type="button" aria-pressed={value === mode} style={{ ...styles.loadModeButton, ...(value === mode ? styles.loadModeButtonOn : {}) }} onClick={() => onChange(mode)}>{label}</button>)}
+  </div>;
 }
 
 function ImportedFoodReview({ food, onSelect, onReset }) {
@@ -4030,6 +4067,9 @@ const styles = {
   foodMacros: { fontSize: 12, color: COLORS.textDim, marginTop: 2, fontFamily: FONT_NUM },
   emptyHint: { fontSize: 13, color: COLORS.textDim, padding: "8px 0", fontStyle: "italic" },
   helpNote: { fontSize: 12, color: COLORS.textDim, lineHeight: 1.5, padding: "4px 2px" },
+  loadModeSelector: { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 5, margin: "0 0 10px" },
+  loadModeButton: { minWidth: 0, background: "rgba(233,166,66,0.08)", color: COLORS.amber, border: "1px solid rgba(233,166,66,0.36)", borderRadius: 7, padding: "7px 3px", fontSize: 10, fontWeight: 700, cursor: "pointer", fontFamily: FONT_BODY },
+  loadModeButtonOn: { background: `linear-gradient(180deg, #F0B453, ${COLORS.amber})`, color: COLORS.bg, borderColor: COLORS.amber, boxShadow: "0 6px 14px rgba(233,166,66,0.18)" },
   warningBanner: { background: "#2a1f0a", border: "1px solid #4a3a14", color: "#E8A33D", fontSize: 12, lineHeight: 1.4, padding: "10px 12px", borderRadius: 8, marginBottom: 10 },
   fieldRow: { marginBottom: 10 },
   fieldLabel: { fontSize: 12, color: COLORS.textDim, display: "block", marginBottom: 4 },
