@@ -63,7 +63,10 @@
         <div class="forge-startup__embers" aria-hidden="true"><i></i><i></i><i></i></div>
       </div>
     </div>
-    <script>window.__forgeStartupAt = performance.now();</script>
+    <script>
+      window.__forgeStartupAt = performance.now();
+      window.__forgeStartupDuration = 1000 + Math.random() * 2000;
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

@@ -50,7 +50,7 @@
       @keyframes forge-dot-three { 0%, 53%, 78%, 100% { opacity: .15; transform: scale(.65); } 63%, 70% { opacity: 1; transform: scale(1); } }
       @media (prefers-reduced-motion: reduce) { .forge-startup__mark, .forge-startup__plate, .forge-startup__name, .forge-startup__embers i { animation: none; } }
     </style>
-    <script type="module" crossorigin src="/The-Forge/assets/index-BQOAT5Hy.js"></script>
+    <script type="module" crossorigin src="/The-Forge/assets/index-BnC3PZxV.js"></script>
     <link rel="stylesheet" crossorigin href="/The-Forge/assets/index-CHYpEmNW.css">
   </head>
   <body>
@@ -65,7 +65,10 @@
         <div class="forge-startup__embers" aria-hidden="true"><i></i><i></i><i></i></div>
       </div>
     </div>
-    <script>window.__forgeStartupAt = performance.now();</script>
+    <script>
+      window.__forgeStartupAt = performance.now();
+      window.__forgeStartupDuration = 1000 + Math.random() * 2000;
+    </script>
     <div id="root"></div>
   </body>
 </html>
