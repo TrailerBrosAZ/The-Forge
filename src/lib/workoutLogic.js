@@ -31,6 +31,29 @@ export function dropSetPrescription(exercise) {
   };
 }
 
+export function repSegmentTargets(exercise) {
+  if (dropSetPrescription(exercise)) return [];
+  const prescription = String(exercise?.r || "").trim();
+  if (!/^\d+(?:\s*[+/]\s*\d+)+$/.test(prescription)) return [];
+  return prescription.split(/[+/]/).map((part) => part.trim());
+}
+
+export function setRepSegments(set, segments) {
+  const clean = segments.map((part) => String(part ?? "").trim());
+  const valid = clean.every((part) => part !== "" && Number.isFinite(Number(part)) && Number(part) > 0);
+  return { ...set, repSegments: clean, reps: valid ? String(clean.reduce((sum, part) => sum + Number(part), 0)) : "" };
+}
+
+export function setReps(set) {
+  if (Array.isArray(set?.repSegments) && set.repSegments.length > 0) {
+    const parts = set.repSegments.map((part) => String(part ?? "").trim());
+    return parts.every((part) => part !== "" && Number.isFinite(Number(part)) && Number(part) > 0)
+      ? parts.reduce((sum, part) => sum + Number(part), 0)
+      : 0;
+  }
+  return Number(set?.reps) > 0 ? Number(set.reps) : 0;
+}
+
 export function setClusterKey(set, index) {
   return set?.clusterId || set?.setId || `row-${index}`;
 }
@@ -45,7 +68,7 @@ export function completedWorkingSetCount(sets = [], explicitDone = true) {
     groups.set(key, rows);
   });
   return [...groups.values()].filter((rows) => rows.every((set) => (
-    explicitDone ? set?.done === true : Number(set?.reps) > 0 || Number(set?.durationSeconds) > 0
+    explicitDone ? set?.done === true && (setReps(set) > 0 || Number(set?.durationSeconds) > 0) : setReps(set) > 0 || Number(set?.durationSeconds) > 0
   ))).length;
 }
 
@@ -63,8 +86,10 @@ export function exerciseGroupLabel(exercises = [], exerciseIndex) {
 
 const VALID_LOAD_MODES = new Set(Object.values(LOAD_MODES));
 const CLEAR_BODYWEIGHT_EXERCISES = new Set([
+  "AB WHEEL ROLLOUT",
   "BICYCLE CRUNCH",
   "BIRD DOGS",
+  "CHIN-UP",
   "DEAD BUG",
   "DIP",
   "GLUTE BRIDGE",
@@ -74,6 +99,7 @@ const CLEAR_BODYWEIGHT_EXERCISES = new Set([
   "PELVIC TILTS",
   "PUSH UP",
   "PUSH-UP",
+  "SWISS BALL LEG CURL",
 ]);
 
 export function exerciseLoadMode(exercise) {
@@ -95,7 +121,7 @@ export function loadFieldLabel(exercise) {
 }
 
 export function formatStrengthSet(exercise, set, empty = "—") {
-  const reps = Number(set?.reps) > 0 ? String(set.reps) : empty;
+  const reps = setReps(set) > 0 ? (set?.repSegments?.length > 1 ? set.repSegments.join("/") : String(setReps(set))) : empty;
   const mode = exerciseLoadMode(exercise);
   if (mode === LOAD_MODES.BODYWEIGHT) return `${reps} reps`;
   const weight = set?.weight !== "" && set?.weight != null ? String(set.weight) : empty;
@@ -107,7 +133,7 @@ export function formatStrengthSet(exercise, set, empty = "—") {
 export function strengthSetScore(exercise, set) {
   const kind = normalizeSetKind(set);
   if (kind === SET_KINDS.WARMUP || kind === SET_KINDS.DROP || kind === SET_KINDS.TIMED) return null;
-  const reps = Number(set?.reps);
+  const reps = setReps(set);
   if (!(reps > 0)) return null;
   const mode = exerciseLoadMode(exercise);
   if (mode === LOAD_MODES.BODYWEIGHT) return reps;
@@ -123,7 +149,7 @@ export function bestStrengthSet(exercise, sessions) {
     (session.sets || []).forEach((set) => {
       const score = strengthSetScore(exercise, set);
       if (score == null) return;
-      if (!best || score > best.score || (score === best.score && Number(set.reps) > Number(best.set.reps))) {
+      if (!best || score > best.score || (score === best.score && setReps(set) > setReps(best.set))) {
         best = { score, set, date: session.date };
       }
     });
@@ -238,7 +264,7 @@ export function exerciseCompleteOnDate(log, date, exercise) {
   const hasGuidedState = strengthSets.some((set) => typeof set?.done === "boolean");
   if (!hasGuidedState) {
     // Historical and list-mode sessions predate explicit per-set completion.
-    return strengthSets.some((set) => Number(set?.reps) > 0 || Number(set?.durationSeconds) > 0);
+    return strengthSets.some((set) => setReps(set) > 0 || Number(set?.durationSeconds) > 0);
   }
   const targetSets = Math.max(1, parseInt(exercise?.ws, 10) || strengthSets.length || 1);
   return completedWorkingSetCount(strengthSets, true) >= targetSets;
@@ -313,6 +339,7 @@ export function findPartialWorkout(logs, plan, date) {
   for (let wi = 0; wi < weeks.length; wi += 1) {
     const week = weeks[wi];
     for (let di = 0; di < (week.days || []).length; di += 1) {
+      if (plan.structure === "weeks" && historicalDayProgress(logs, plan, wi, di).complete) continue;
       const progress = dayProgress(logs, plan, wi, di, date);
       const day = week.days[di];
       const hasStarted = (day.ex || []).some((exercise, exerciseIndex) => sessionOnDate(
@@ -344,8 +371,7 @@ export function findNextWorkout(logs, plan, date) {
       for (let di = 0; di < (week.days || []).length; di += 1) {
         const day = week.days[di];
         if (!day.ex?.length) continue;
-        const hasAnyCompleteDate = completionDatesForDay(logs, plan, week, day, wi, di).length > 0;
-        if (!hasAnyCompleteDate) return { weekIndex: wi, dayIndex: di, exerciseIndex: 0, reason: "next" };
+        if (!historicalDayProgress(logs, plan, wi, di).complete) return { weekIndex: wi, dayIndex: di, exerciseIndex: 0, reason: "next" };
       }
     }
     return {

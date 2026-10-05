@@ -124,6 +124,7 @@ export function workoutCsvRows({ profile, plans, workoutLogs, resolveIdentity })
         segment_index: set.segmentIndex ?? "",
         weight: set.weight ?? "",
         reps: set.reps ?? "",
+        rep_segments: Array.isArray(set.repSegments) ? set.repSegments.join("/") : "",
         duration_minutes: set.duration ?? "",
         target_reps: set.targetReps || "",
         target_rpe: set.targetRpe || "",

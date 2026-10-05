@@ -20,8 +20,11 @@ import {
   loadFieldLabel,
   logForExercise,
   planWeeks,
+  repSegmentTargets,
   resolveWorkoutLogIdentity,
   SET_KINDS,
+  setRepSegments,
+  setReps,
   stableLogKey,
   strengthSetScore,
 } from "./lib/workoutLogic.js";
@@ -54,7 +57,7 @@ const BODY_VB = {"maleFront":"0 0 724 1448","maleBack":"724 0 724 1448","femaleF
 // against. saveJSON stays async-shaped only so call sites read naturally
 // inside useEffect; it resolves immediately either way.
 const STORAGE_KEY_PREFIX = "theforge:";
-const APP_RELEASE = "2026.07.29.2";
+const APP_RELEASE = "2026.10.05.1";
 function readLocal(key, fallback) {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY_PREFIX + key);
@@ -1164,6 +1167,7 @@ function PlanBuilder({ existing, createdBy, onCancel, onSave }) {
               </div>
             </div>
           )}
+                        <div style={{ ...styles.helpNote, marginTop: 5 }}>For multiple rep phases in one set, enter targets like 7/7/7 or 10+2.</div>
         </div>
       );})}
 
@@ -1510,6 +1514,7 @@ function parseTargetReps(reps) {
   const nums = [...text.matchAll(/\d+(\.\d+)?/g)].map((m) => Number(m[0])).filter((n) => n > 0);
   if (!nums.length) return null;
   if (text.includes("-") && nums.length >= 2) return (nums[0] + nums[1]) / 2;
+  if (/^\d+(?:\s*[+/]\s*\d+)+$/.test(text)) return nums.reduce((sum, value) => sum + value, 0);
   return nums[0];
 }
 function parseTargetRpe(rpe) {
@@ -1550,7 +1555,7 @@ function suggestExerciseWeight(ex, sessions, setIndex = 0) {
       const historicalMode = set.loadMode || session.loadMode || mode;
       if (historicalMode !== mode) return;
       const weight = Number(set.weight);
-      const reps = Number(set.reps);
+      const reps = setReps(set);
       if (!(weight > 0) || !(reps > 0)) return;
       const e1rm = weight * (1 + reps / 30);
       let estimated = e1rm / (1 + targetReps / 30);
@@ -1565,26 +1570,73 @@ function suggestExerciseWeight(ex, sessions, setIndex = 0) {
   const weighted = samples.reduce((sum, sample) => sum + sample.estimated * sample.weight, 0) / samples.reduce((sum, sample) => sum + sample.weight, 0);
   return roundSuggestedWeight(weighted, ex?.n);
 }
+function RepInputs({ set, target, idBase, onChange, inputRef }) {
+  const segments = Array.isArray(set?.repSegments) && set.repSegments.length ? set.repSegments : null;
+  const values = segments || [set?.reps ?? ""];
+  const multi = values.length > 1;
+  const change = (index, value) => onChange(segments
+    ? setRepSegments(set, values.map((part, partIndex) => partIndex === index ? value : part))
+    : { ...set, reps: value });
+  const add = () => onChange(setRepSegments(set, [...values, ""]));
+  const remove = (index) => onChange(setRepSegments(set, values.filter((_, partIndex) => partIndex !== index)));
+  return (
+    <div style={{ flex: 1, minWidth: 0 }}>
+      {multi && <div style={{ ...styles.dimLabel, marginBottom: 5 }}>Rep phases · {setReps(set) || "—"} total</div>}
+      <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(values.length, 4)}, minmax(0, 1fr))`, gap: 5, flex: 1, minWidth: 0 }}>
+          {values.map((value, index) => (
+            <div key={index} style={{ minWidth: 0 }}>
+              {multi && <label htmlFor={`${idBase}-phase-${index}`} style={{ ...styles.fieldLabel, fontSize: 10 }}>Phase {index + 1}</label>}
+              <input id={`${idBase}-phase-${index}`} ref={index === 0 ? inputRef : undefined} aria-label={multi ? `Phase ${index + 1} reps` : "Reps"} style={{ ...styles.setInput, padding: "10px 4px" }} type="number" min="1" inputMode="numeric" value={value} placeholder={multi ? (repSegmentTargets({ r: target })[index] || "reps") : target} onChange={(event) => change(index, event.target.value)} />
+              {multi && <button type="button" style={{ ...styles.miniLabel, background: "transparent", border: 0, color: COLORS.textDim, padding: "3px 0", cursor: "pointer" }} onClick={() => remove(index)} aria-label={`Remove rep phase ${index + 1}`}>Remove</button>}
+            </div>
+          ))}
+        </div>
+        <button type="button" style={{ ...styles.iconButton, flex: "0 0 30px" }} onClick={add} aria-label="Add rep phase" title="Add rep phase"><Plus size={16} color={COLORS.amber} /></button>
+      </div>
+    </div>
+  );
+}
 function initialStrengthSets(ex, sessions, todaySession) {
   const targetSets = parseInt(ex?.ws) || 3;
-  if (todaySession) return (todaySession.sets || []).map((set, index) => ({ kind: SET_KINDS.WORKING, setId: set.setId || `${ex?.id || "set"}-${index + 1}`, ...set }));
+  if (todaySession) {
+    const savedSets = todaySession.sets || [];
+    const hasGuidedCompletion = savedSets.some((set) => typeof set?.done === "boolean");
+    return savedSets.map((savedSet, index) => {
+      const targets = repSegmentTargets(ex);
+      const segments = Array.isArray(savedSet.repSegments) && savedSet.repSegments.length
+        ? savedSet.repSegments
+        : targets.length > 1 && String(savedSet.reps || "").trim() === String(ex.r || "").trim()
+          ? targets
+          : null;
+      const set = segments ? setRepSegments(savedSet, segments) : savedSet;
+      return {
+        kind: SET_KINDS.WORKING,
+        setId: set.setId || `${ex?.id || "set"}-${index + 1}`,
+        ...set,
+        done: hasGuidedCompletion ? set.done === true : setReps(set) > 0 || Number(set?.durationSeconds) > 0,
+      };
+    });
+  }
   const rows = [];
   const warmups = Math.max(0, Number(ex?.advancedSets?.warmupSets) || 0);
   for (let i = 0; i < warmups; i += 1) {
     rows.push({ setId: `${ex?.id || "exercise"}-warmup-${i + 1}`, kind: SET_KINDS.WARMUP, weight: "", reps: "", note: "" });
   }
   const drop = dropSetPrescription(ex);
+  const repTargets = repSegmentTargets(ex);
   for (let i = 0; i < targetSets; i += 1) {
     const suggested = suggestExerciseWeight(ex, sessions, i);
     const clusterId = drop ? `${ex?.id || "exercise"}-cluster-${i + 1}` : "";
-    rows.push({
+    const workingSet = {
       setId: `${ex?.id || "exercise"}-working-${i + 1}`,
       ...(clusterId ? { clusterId, segmentIndex: 0 } : {}),
       kind: ex?.advancedSets?.finalAmrap && i === targetSets - 1 ? SET_KINDS.AMRAP : SET_KINDS.WORKING,
       weight: suggested,
       reps: drop?.workingReps || ex?.r || "",
       note: "",
-    });
+    };
+    rows.push(repTargets.length > 1 ? setRepSegments(workingSet, repTargets) : workingSet);
     if (drop) {
       const dropWeight = Number(suggested) > 0 ? roundSuggestedWeight(Number(suggested) * drop.ratio, ex?.n) : "";
       rows.push({
@@ -1641,6 +1693,9 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
   const [cardioIntensity, setCardioIntensity] = useState(todaySession?.sets?.[0]?.intensity || ex?.intensity || "");
   const [cardioError, setCardioError] = useState("");
   const [strengthError, setStrengthError] = useState("");
+  const [correctionIndex, setCorrectionIndex] = useState(null);
+  const [correctionDraft, setCorrectionDraft] = useState(null);
+  const [correctionError, setCorrectionError] = useState("");
   const restTimer = useDeadlineTimer(timerKey, parseRestSeconds(ex?.groupRest || ex?.rest));
 
   useEffect(() => {
@@ -1657,6 +1712,9 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
     setCardioIntensity(nextToday?.sets?.[0]?.intensity || ex?.intensity || "");
     setCardioError("");
     setStrengthError("");
+    setCorrectionIndex(null);
+    setCorrectionDraft(null);
+    setCorrectionError("");
   }, [activeIndex, day.d, ex?.duration, ex?.intensity, ex?.loadMode, ex?.n, ex?.r, ex?.ws, plan, wkNum, today]);
 
   if (!ex) return <div style={styles.emptyHint}>No exercises in this day.</div>;
@@ -1693,8 +1751,8 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
           <button style={{ ...styles.primaryButton, width: "100%", marginTop: 12 }} onClick={saveCardio}>{completed ? "Update Cardio" : "Complete Cardio"}</button>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button style={styles.secondaryButton} disabled={activeIndex === 0} onClick={() => setActiveIndex(Math.max(0, activeIndex - 1))}>Previous</button>
-          <button style={styles.secondaryButton} disabled={activeIndex >= exercises.length - 1} onClick={() => setActiveIndex(Math.min(exercises.length - 1, activeIndex + 1))}>Next</button>
+          <button style={styles.secondaryButton} disabled={activeIndex === 0} onClick={() => setActiveIndex(Math.max(0, activeIndex - 1))}>Previous exercise</button>
+          <button style={styles.secondaryButton} disabled={activeIndex >= exercises.length - 1} onClick={() => setActiveIndex(Math.min(exercises.length - 1, activeIndex + 1))}>Next exercise</button>
         </div>
       </div>
     );
@@ -1702,6 +1760,10 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
 
   const current = sets[setIndex] || { weight: "", reps: "", note: "" };
   const tracksLoad = loadMode !== LOAD_MODES.BODYWEIGHT;
+  const activeFieldBase = `guided-${ex.id || activeIndex}-set-${setIndex}`;
+  const correctionMode = correctionDraft?.loadMode || loadMode;
+  const correctionTracksLoad = correctionMode !== LOAD_MODES.BODYWEIGHT;
+  const correctionFieldBase = `guided-${ex.id || activeIndex}-correction-${correctionIndex}`;
   const completed = exerciseCompleteOnDate(log, today, ex);
   const progress = `${activeIndex + 1}/${exercises.length}`;
   const updateCurrent = (field, val) => setSets((prev) => prev.map((s, i) => {
@@ -1711,7 +1773,33 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
     }
     return s;
   }));
-  const saveNow = (nextSets = sets) => onSaveExercise(effectiveExercise, nextSets.map((set) => ({ ...set, loadMode })), activeIndex);
+  const updateCurrentReps = (updated) => setSets((prev) => prev.map((set, index) => index === setIndex ? updated : set));
+  const saveNow = (nextSets = sets) => onSaveExercise(effectiveExercise, nextSets.map((set) => ({ ...set, done: set.done === true, loadMode })), activeIndex);
+  const openCorrection = (index) => {
+    setCorrectionIndex(index);
+    setCorrectionDraft({ ...sets[index] });
+    setCorrectionError("");
+  };
+  const cancelCorrection = () => {
+    setCorrectionIndex(null);
+    setCorrectionDraft(null);
+    setCorrectionError("");
+  };
+  const saveCorrection = () => {
+    if (!correctionDraft || correctionIndex == null) return;
+    if (!(setReps(correctionDraft) > 0)) {
+      setCorrectionError("Enter positive reps before saving this correction.");
+      return;
+    }
+    if (correctionTracksLoad && correctionDraft.weight !== "" && !isNonNegativeNumber(correctionDraft.weight)) {
+      setCorrectionError(`Enter a non-negative ${loadFieldLabel({ ...ex, loadMode: correctionMode }).toLowerCase()}.`);
+      return;
+    }
+    const nextSets = sets.map((set, index) => index === correctionIndex ? { ...set, ...correctionDraft, done: true } : set);
+    setSets(nextSets);
+    saveNow(nextSets);
+    cancelCorrection();
+  };
   const changeLoadMode = (nextMode) => {
     setLoadMode(nextMode);
     setStrengthError("");
@@ -1722,7 +1810,7 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
     })));
   };
   const completeSet = () => {
-    if (!(Number(current.reps) > 0)) {
+    if (!(setReps(current) > 0)) {
       setStrengthError("Enter positive reps before completing this set.");
       return;
     }
@@ -1797,9 +1885,65 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
         {completed && <span style={{ ...styles.badge, background: COLORS.green, color: COLORS.bg }}>Logged</span>}
       </div>
       <div style={styles.exTitle}>{titleCase(ex.n)}</div>
-      <div style={styles.exPrescription}>{ex.ws} sets x {ex.r} reps{ex.rpe ? ` @ ${ex.rpe}` : ""}</div>
+      <div style={styles.exPrescription}>{ex.ws} sets x {ex.r} reps{ex.rpe ? ` @ ${ex.rpe}` : ""}{loadMode === LOAD_MODES.BODYWEIGHT ? <span style={styles.dimLabel}> · bodyweight</span> : null}</div>
       {lastSession && <div style={styles.exLastLine}>last: {lastSession.sets.map((s) => formatStrengthSet(ex, s, "-")).join("  ")}</div>}
       {ex.note && <div style={styles.exNote}>{ex.note}</div>}
+
+      <div style={{ marginTop: 2 }}>
+        <div style={{ display: "flex", gap: 6, overflowX: "auto", padding: "2px 1px 3px", WebkitOverflowScrolling: "touch" }}>
+          {sets.map((set, index) => {
+            const done = set.done === true;
+            const currentSet = index === setIndex;
+            const label = `Set ${setDisplayLabel(sets, index)} · ${setKindLabel(set)}`;
+            return (
+              <button
+                type="button"
+                key={set.setId || index}
+                aria-label={done ? `Correct completed ${label}` : currentSet ? `Current ${label}` : `Upcoming ${label}`}
+                aria-pressed={correctionIndex === index}
+                disabled={!done}
+                onClick={() => openCorrection(index)}
+                style={{
+                  ...styles.secondaryButton,
+                  flex: "0 0 62px",
+                  minHeight: 46,
+                  padding: "5px 3px",
+                  fontSize: 10,
+                  lineHeight: 1.2,
+                  borderColor: correctionIndex === index ? COLORS.amber : done ? COLORS.green : currentSet ? COLORS.amber : COLORS.cardBorder,
+                  background: correctionIndex === index ? "rgba(233,166,66,.14)" : done ? "rgba(100,189,130,.10)" : currentSet ? "rgba(233,166,66,.08)" : "transparent",
+                  color: done ? COLORS.green : currentSet ? COLORS.amber : COLORS.textDim,
+                  opacity: done || currentSet ? 1 : 0.68,
+                }}
+              >
+                {done ? "✓ " : currentSet ? "● " : "○ "}{setDisplayLabel(sets, index)}<br /><span style={{ fontWeight: 500 }}>{setKindLabel(set)}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ ...styles.helpNote, marginTop: 3 }}>Tap a completed set to edit. Your current set and rest timer stay in place.</div>
+
+        {correctionDraft && correctionIndex != null && (
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${COLORS.cardBorder}` }}>
+            <div style={styles.cardHeader}>Correct Set {setDisplayLabel(sets, correctionIndex)} · {setKindLabel(correctionDraft)}</div>
+            <div style={{ display: "grid", gridTemplateColumns: correctionTracksLoad && !(correctionDraft.repSegments?.length > 1) ? "1fr 1fr" : "1fr", gap: 10 }}>
+              {correctionTracksLoad && <div>
+                <label htmlFor={`${correctionFieldBase}-weight`} style={styles.fieldLabel}>Correction {loadFieldLabel({ ...ex, loadMode: correctionMode })}</label>
+                <input id={`${correctionFieldBase}-weight`} style={styles.setInput} type="number" min="0" inputMode="decimal" value={correctionDraft.weight ?? ""} onChange={(e) => setCorrectionDraft((draft) => ({ ...draft, weight: e.target.value }))} />
+              </div>}
+              <div>
+                <div style={styles.fieldLabel}>Correction reps</div>
+                <RepInputs set={correctionDraft} target={ex.r} idBase={`${correctionFieldBase}-reps`} onChange={setCorrectionDraft} />
+              </div>
+            </div>
+            {correctionError && <div role="alert" style={{ ...styles.dimLabel, color: COLORS.red, marginTop: 10 }}>{correctionError}</div>}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12 }}>
+              <button style={styles.primaryButton} onClick={saveCorrection}>Save correction</button>
+              <button style={styles.secondaryButton} onClick={cancelCorrection}>Cancel</button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {restTimer.active && restTimer.remaining > 0 && (
         <div style={styles.restPanel}>
@@ -1817,16 +1961,17 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
       <div style={styles.guidedSetBox}>
         <div style={styles.cardHeader}>Set {setDisplayLabel(sets, setIndex)} · {setKindLabel(current)}</div>
         <LoadModeSelector value={loadMode} onChange={changeLoadMode} />
-        <div style={{ display: "grid", gridTemplateColumns: tracksLoad ? "1fr 1fr" : "1fr", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: tracksLoad && !(current.repSegments?.length > 1) ? "1fr 1fr" : "1fr", gap: 10 }}>
           {tracksLoad && <div>
-            <label style={styles.fieldLabel}>{loadFieldLabel(effectiveExercise)}</label>
-            <input style={styles.setInput} type="number" min="0" inputMode="decimal" value={current.weight} placeholder={suggestExerciseWeight(effectiveExercise, historicalSessions, setIndex) || lastSession?.sets[setIndex]?.weight || "lbs"} onChange={(e) => updateCurrent("weight", e.target.value)} />
+            <label htmlFor={`${activeFieldBase}-weight`} style={styles.fieldLabel}>{loadFieldLabel(effectiveExercise)}</label>
+            <input id={`${activeFieldBase}-weight`} style={styles.setInput} type="number" min="0" inputMode="decimal" value={current.weight} placeholder={suggestExerciseWeight(effectiveExercise, historicalSessions, setIndex) || lastSession?.sets[setIndex]?.weight || "lbs"} onChange={(e) => updateCurrent("weight", e.target.value)} />
           </div>}
           <div>
-            <label style={styles.fieldLabel}>Reps</label>
-            <input style={styles.setInput} type="number" inputMode="numeric" value={current.reps} placeholder={current.kind === SET_KINDS.DROP ? dropSetPrescription(ex)?.dropReps : ex.r} onChange={(e) => updateCurrent("reps", e.target.value)} />
+            <div style={styles.fieldLabel}>Reps</div>
+            <RepInputs set={current} target={current.kind === SET_KINDS.DROP ? dropSetPrescription(ex)?.dropReps : ex.r} idBase={`${activeFieldBase}-reps`} onChange={updateCurrentReps} />
           </div>
         </div>
+        <div style={{ ...styles.helpNote, marginTop: 8 }}>Use + beside reps to add another phase within this set.</div>
         {loadMode === LOAD_MODES.BODYWEIGHT && <div style={{ ...styles.helpNote, marginTop: 8 }}>Bodyweight exercise — only reps are tracked.</div>}
         {strengthError && <div role="alert" style={{ ...styles.dimLabel, color: COLORS.red, marginTop: 10 }}>{strengthError}</div>}
         {current.kind === SET_KINDS.DROP && <div style={{ ...styles.helpNote, marginTop: 8 }}>Continue immediately from the working segment. Rest begins after this drop segment.</div>}
@@ -1834,9 +1979,9 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
       </div>
 
       <div style={{ display: "flex", gap: 8 }}>
-        <button style={styles.secondaryButton} disabled={activeIndex === 0} onClick={() => setActiveIndex(Math.max(0, activeIndex - 1))}>Previous</button>
+        <button style={styles.secondaryButton} disabled={activeIndex === 0} onClick={() => setActiveIndex(Math.max(0, activeIndex - 1))}>Previous exercise</button>
         <button style={{ ...styles.secondaryButton, flex: 1 }} onClick={() => saveNow()}>Save Progress</button>
-        <button style={styles.secondaryButton} disabled={activeIndex >= exercises.length - 1} onClick={() => setActiveIndex(Math.min(exercises.length - 1, activeIndex + 1))}>Next</button>
+        <button style={styles.secondaryButton} disabled={activeIndex >= exercises.length - 1} onClick={() => setActiveIndex(Math.min(exercises.length - 1, activeIndex + 1))}>Next exercise</button>
       </div>
     </div>
   );
@@ -1947,7 +2092,7 @@ function ExerciseLogger({ plan, day, ex, wkNum, isWeekly, week, timerKey, log, o
   const lastSession = sessions.filter((s) => s.date !== today).slice(-1)[0];
   const todaySession = sessions.find((s) => s.date === today);
 
-  const loadMode = exerciseLoadMode(ex);
+  const loadMode = todaySession?.sets?.[0]?.loadMode || exerciseLoadMode(ex);
   const tracksLoad = loadMode !== LOAD_MODES.BODYWEIGHT;
   const pr = bestStrengthSet(ex, sessions);
   const progression = exerciseProgression(sessions, loadMode);
@@ -1973,11 +2118,12 @@ function ExerciseLogger({ plan, day, ex, wkNum, isWeekly, week, timerKey, log, o
       return s;
     }));
   }
+  function updateSetReps(i, updated) { setSets((prev) => prev.map((set, index) => index === i ? updated : set)); }
   function addSet() { setSets((prev) => [...prev, { setId: uid(), kind: SET_KINDS.WORKING, weight: tracksLoad ? (prev[prev.length - 1]?.weight || "") : "", reps: "", note: "" }]); }
   function removeSet(i) { setSets((prev) => prev.filter((_, idx) => idx !== i)); }
   function saveSession() {
-    const completed = sets.filter((set) => set.reps !== "" || (tracksLoad && set.weight !== ""));
-    const valid = completed.length > 0 && completed.every((set) => Number(set.reps) > 0 && (!tracksLoad || set.weight === "" || isNonNegativeNumber(set.weight)));
+    const completed = sets.filter((set) => set.reps !== "" || set.repSegments?.some((part) => String(part).trim() !== "") || (tracksLoad && set.weight !== ""));
+    const valid = completed.length > 0 && completed.every((set) => setReps(set) > 0 && (!tracksLoad || set.weight === "" || isNonNegativeNumber(set.weight)));
     if (!valid) { setError(tracksLoad ? `Log positive reps and a non-negative ${loadFieldLabel(ex).toLowerCase()}.` : "Log at least one set with positive reps."); return; }
     setError("");
     onSave(completed.map((set) => ({ ...set, done: true })));
@@ -1988,7 +2134,7 @@ function ExerciseLogger({ plan, day, ex, wkNum, isWeekly, week, timerKey, log, o
       <button style={styles.backRow} onClick={onBack}><ChevronLeft size={18} /> Day {day.d}</button>
       <div style={styles.card}>
         <div style={styles.exTitle}>{titleCase(ex.n)}</div>
-        <div style={styles.exPrescription}>{ex.ws} working sets × {ex.r} reps{ex.rpe ? ` @ ${ex.rpe}` : ""}{ex.rest ? <span style={styles.dimLabel}> · rest {ex.rest.toLowerCase()}</span> : null}</div>
+        <div style={styles.exPrescription}>{ex.ws} working sets × {ex.r} reps{ex.rpe ? ` @ ${ex.rpe}` : ""}{loadMode === LOAD_MODES.BODYWEIGHT ? <span style={styles.dimLabel}> · bodyweight</span> : null}{ex.rest ? <span style={styles.dimLabel}> · rest {ex.rest.toLowerCase()}</span> : null}</div>
         {ex.note && <div style={styles.exNote}>{ex.note}</div>}
         <div style={styles.refRow}>
           {lastSession && <div style={styles.refChip}><History size={13} /> Last: {lastSession.sets.map((s) => formatStrengthSet(ex, s)).join(" ")}</div>}
@@ -2020,9 +2166,10 @@ function ExerciseLogger({ plan, day, ex, wkNum, isWeekly, week, timerKey, log, o
                 {setDisplayLabel(sets, i)}<small style={{ display: "block", fontFamily: FONT_BODY, fontSize: 9 }}>{setKindLabel(s)}</small>
               </span>
               {tracksLoad && <input ref={(el) => weightRefs.current[i] = el} style={styles.setInput} type="number" min="0" inputMode="decimal" placeholder={lastSession?.sets[i]?.weight || "lbs"} value={s.weight} onChange={(e) => updateSet(i, "weight", e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") repRefs.current[i]?.focus(); }} onBlur={() => { if (s.weight && !s.reps) repRefs.current[i]?.focus(); }} />}
-              <input ref={(el) => repRefs.current[i] = el} style={styles.setInput} type="number" min="1" inputMode="numeric" placeholder={s.kind === SET_KINDS.DROP ? dropSetPrescription(ex)?.dropReps : ex.r} value={s.reps} onChange={(e) => updateSet(i, "reps", e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") tracksLoad ? weightRefs.current[i + 1]?.focus() : repRefs.current[i + 1]?.focus(); }} onBlur={() => { if (s.reps) tracksLoad ? weightRefs.current[i + 1]?.focus() : repRefs.current[i + 1]?.focus(); }} />
+              {s.repSegments?.length > 1 ? <span style={{ ...styles.setCol, textAlign: "center", color: COLORS.amber }}>{setReps(s) || "—"} total</span> : <RepInputs set={s} target={s.kind === SET_KINDS.DROP ? dropSetPrescription(ex)?.dropReps : ex.r} idBase={`list-${ex.id || ex.n}-${i}`} onChange={(updated) => updateSetReps(i, updated)} inputRef={(el) => repRefs.current[i] = el} />}
               <button style={styles.iconButton} onClick={() => removeSet(i)}><Trash2 size={14} color={COLORS.textDim} /></button>
             </div>
+            {s.repSegments?.length > 1 && <div style={{ marginBottom: 10, marginLeft: 60 }}><RepInputs set={s} target={ex.r} idBase={`list-${ex.id || ex.n}-${i}`} onChange={(updated) => updateSetReps(i, updated)} /></div>}
             {showNotes && <input style={styles.noteInput} placeholder="note (optional)" value={s.note} onChange={(e) => updateSet(i, "note", e.target.value)} />}
           </div>
         ))}
@@ -2030,6 +2177,7 @@ function ExerciseLogger({ plan, day, ex, wkNum, isWeekly, week, timerKey, log, o
           <button style={styles.secondaryButton} onClick={addSet}><Plus size={14} style={{ verticalAlign: "-2px" }} /> Set</button>
           <button style={styles.secondaryButton} onClick={() => setShowNotes((v) => !v)}>{showNotes ? "Hide notes" : "Notes"}</button>
         </div>
+        <div style={{ ...styles.helpNote, marginTop: 8 }}>Use + beside reps to add another phase within a set.</div>
         {dropSetPrescription(ex) && <div style={{ ...styles.helpNote, marginTop: 8 }}>Drop segments follow their working segment immediately; the suggested load is {Math.round(dropSetPrescription(ex).ratio * 100)}% and remains editable.</div>}
         {loadMode === LOAD_MODES.BODYWEIGHT && <div style={{ ...styles.helpNote, marginTop: 8 }}>Bodyweight exercise — only reps are tracked.</div>}
         {error && <div role="alert" style={{ ...styles.dimLabel, color: COLORS.red, marginTop: 10 }}>{error}</div>}
