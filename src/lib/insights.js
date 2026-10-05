@@ -1,3 +1,5 @@
+import { performedSets, sessionHasPerformedSet } from "./performedSets.js";
+
 function localDateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
@@ -20,7 +22,7 @@ function workoutSessions(workoutLogs = {}) {
 }
 
 export function consistencyMatrix({ workoutLogs = {}, dayLog = {}, weights = [], targets, today = localDateKey(new Date()), days = 7 }) {
-  const workoutDates = new Set(workoutSessions(workoutLogs).filter((session) => (session.sets || []).some((set) => set.done === true || Number(set.reps) > 0 || Number(set.duration) > 0)).map((session) => session.date));
+  const workoutDates = new Set(workoutSessions(workoutLogs).filter(sessionHasPerformedSet).map((session) => session.date));
   const weightDates = new Set(weights.map((entry) => entry.date));
   return Array.from({ length: days }, (_, index) => {
     const date = addDays(today, index - days + 1);
@@ -40,9 +42,11 @@ export function consistencyMatrix({ workoutLogs = {}, dayLog = {}, weights = [],
 
 export function weeklyForgeBrief({ workoutLogs = {}, dayLog = {}, weights = [], bodyScans = [], targets, today = localDateKey(new Date()) }) {
   const start = addDays(today, -6);
-  const sessions = workoutSessions(workoutLogs).filter((session) => session.date >= start && session.date <= today);
+  const sessions = workoutSessions(workoutLogs).filter((session) => session.date >= start && session.date <= today && sessionHasPerformedSet(session));
   const workoutDates = new Set(sessions.map((session) => session.date));
-  const workingSets = sessions.reduce((count, session) => count + (session.sets || []).filter((set) => set.kind !== "warmup" && (set.done === true || Number(set.reps) > 0)).length, 0);
+  const workingSets = sessions.reduce((count, session) => count + performedSets(session).filter((set) => (
+    set.kind !== "warmup" && set.type !== "cardio" && Number(set.reps) > 0
+  )).length, 0);
   const nutrition = Object.entries(dayLog).filter(([date]) => date >= start && date <= today).map(([, day]) => dayTotals(day)).filter((totals) => totals.calories > 0 || totals.protein > 0);
   const proteinHits = nutrition.filter((totals) => totals.protein >= targets.protein).length;
   const calorieDelta = nutrition.length ? Math.round(nutrition.reduce((sum, totals) => sum + totals.calories - targets.calories, 0) / nutrition.length) : null;
@@ -50,7 +54,7 @@ export function weeklyForgeBrief({ workoutLogs = {}, dayLog = {}, weights = [], 
   const weightDelta = recentWeights.length > 1 ? recentWeights.at(-1).lbs - recentWeights[0].lbs : null;
   const latestBodyDate = [...weights.map((entry) => entry.date), ...bodyScans.map((scan) => scan.scanDate)].sort().at(-1) || null;
   const parts = [];
-  if (workoutDates.size) parts.push(`${workoutDates.size} workout${workoutDates.size === 1 ? "" : "s"} completed`);
+  if (workoutDates.size) parts.push(`${workoutDates.size} training day${workoutDates.size === 1 ? "" : "s"} logged`);
   if (nutrition.length) parts.push(`protein hit on ${proteinHits} of ${nutrition.length} logged days`);
   return {
     training: { workouts: workoutDates.size, workingSets },
@@ -62,7 +66,7 @@ export function weeklyForgeBrief({ workoutLogs = {}, dayLog = {}, weights = [], 
 
 export function exerciseProgression(sessions = [], loadMode = "external") {
   return sessions.map((session) => {
-    const eligible = (session.sets || []).filter((set) => !["warmup", "drop", "timed"].includes(set.kind) && Number(set.reps) > 0);
+    const eligible = performedSets(session).filter((set) => !["warmup", "drop", "timed"].includes(set.kind) && Number(set.reps) > 0);
     const heaviest = eligible.reduce((best, set) => Number(set.weight) > Number(best?.weight || -Infinity) ? set : best, null);
     const volume = eligible.reduce((sum, set) => sum + (Number(set.weight) || 0) * (Number(set.reps) || 0), 0);
     const bestReps = eligible.reduce((best, set) => Math.max(best, Number(set.reps) || 0), 0);
@@ -108,8 +112,8 @@ export function weeklyCrossDomain({ workoutLogs = {}, dayLog = {}, weights = [],
   const rows = Array.from({ length: weeks }, (_, index) => {
     const end = addDays(today, -(weeks - 1 - index) * 7);
     const start = addDays(end, -6);
-    const weekSessions = sessions.filter((session) => session.date >= start && session.date <= end);
-    const volume = weekSessions.reduce((sum, session) => sum + (session.sets || []).reduce((setSum, set) => setSum + (Number(set.weight) || 0) * (Number(set.reps) || 0), 0), 0);
+    const weekSessions = sessions.filter((session) => session.date >= start && session.date <= end && sessionHasPerformedSet(session));
+    const volume = weekSessions.reduce((sum, session) => sum + performedSets(session).reduce((setSum, set) => setSum + (Number(set.weight) || 0) * (Number(set.reps) || 0), 0), 0);
     const nutrition = Object.entries(dayLog).filter(([date]) => date >= start && date <= end).map(([, day]) => dayTotals(day)).filter((totals) => totals.protein > 0);
     const proteinPct = nutrition.length ? nutrition.reduce((sum, totals) => sum + totals.protein / Math.max(1, targets.protein), 0) / nutrition.length * 100 : null;
     const weekWeights = weights.filter((entry) => entry.date >= start && entry.date <= end).sort((a, b) => a.date.localeCompare(b.date));

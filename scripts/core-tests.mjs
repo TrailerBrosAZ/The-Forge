@@ -15,7 +15,10 @@ import {
   legacyLogKey,
   LOAD_MODES,
   resolveWorkoutLogIdentity,
+  repSegmentTargets,
   SET_KINDS,
+  setRepSegments,
+  setReps,
   stableLogKey,
   strengthSetScore,
 } from "../src/lib/workoutLogic.js";
@@ -37,6 +40,8 @@ import { copyMealIntoDay, rankFoodSuggestions } from "../src/lib/foodHistory.js"
 import { csvCell, rowsToCsv, workoutCsvRows } from "../src/lib/csvExport.js";
 import { createBackupObject, inspectBackupText, summarizeStoredData, validateBackupObject } from "../src/lib/backup.js";
 import { consistencyMatrix, exerciseProgression, recompositionSeries, scanComparison, weeklyCrossDomain, weeklyForgeBrief } from "../src/lib/insights.js";
+import "./nutrition-history-tests.mjs";
+import "./performed-sets-tests.mjs";
 
 const plan = ensurePlanIds({
   id: "plan",
@@ -60,6 +65,13 @@ assert.deepEqual(historicalDayProgress(logs, plan, 0, 0), { required: 2, complet
 assert.equal(exerciseCompleteEver(logs[squatKey], plan.weeks[0].days[0].ex[0]), true);
 assert.deepEqual(findNextWorkout(logs, plan, date), { weekIndex: 1, dayIndex: 0, exerciseIndex: 0, reason: "next" });
 
+const splitDateLogs = {
+  [squatKey]: { sessions: [{ date: "2026-07-24", sets: [{ reps: "8", weight: "100" }] }] },
+  [rowLegacyKey]: { sessions: [{ date: "2026-07-25", sets: [{ reps: "10", weight: "50" }] }] },
+};
+assert.equal(historicalDayProgress(splitDateLogs, plan, 0, 0).complete, true);
+assert.deepEqual(findNextWorkout(splitDateLogs, plan, date), { weekIndex: 1, dayIndex: 0, exerciseIndex: 0, reason: "next" });
+
 const partial = { [squatKey]: logs[squatKey] };
 assert.deepEqual(historicalDayProgress(partial, plan, 0, 0), { required: 2, completed: 1, complete: false, empty: false });
 assert.deepEqual(findNextWorkout(partial, plan, date), { weekIndex: 0, dayIndex: 0, exerciseIndex: 1, reason: "partial" });
@@ -79,17 +91,29 @@ assert.deepEqual(resolveWorkoutLogIdentity(rowLegacyKey, [plan]), {
 const bodyweightExercise = ensurePlanIds({
   id: "bodyweight",
   structure: "days",
-  days: [{ d: 1, ex: [{ n: "Hanging Leg Raise" }, { n: "Dip" }, { n: "Weighted Pull-Up" }] }],
+  days: [{ d: 1, ex: [{ n: "Hanging Leg Raise" }, { n: "Dip" }, { n: "Swiss Ball Leg Curl" }, { n: "Ab Wheel Rollout" }, { n: "Chin-Up" }, { n: "Weighted Pull-Up" }] }],
 }).days[0].ex;
 assert.equal(exerciseLoadMode(bodyweightExercise[0]), LOAD_MODES.BODYWEIGHT);
 assert.equal(exerciseLoadMode(bodyweightExercise[1]), LOAD_MODES.BODYWEIGHT);
-assert.equal(exerciseLoadMode(bodyweightExercise[2]), LOAD_MODES.ADDED);
+assert.equal(exerciseLoadMode(bodyweightExercise[2]), LOAD_MODES.BODYWEIGHT);
+assert.equal(exerciseLoadMode(bodyweightExercise[3]), LOAD_MODES.BODYWEIGHT);
+assert.equal(exerciseLoadMode(bodyweightExercise[4]), LOAD_MODES.BODYWEIGHT);
+assert.equal(exerciseLoadMode(bodyweightExercise[5]), LOAD_MODES.ADDED);
 assert.equal(exerciseLoadMode({ n: "Dip", loadMode: LOAD_MODES.ADDED }), LOAD_MODES.ADDED);
 assert.equal(formatStrengthSet(bodyweightExercise[0], { reps: "12", weight: "0" }), "12 reps");
-assert.equal(formatStrengthSet(bodyweightExercise[2], { reps: "6", weight: "25" }), "+25×6");
+assert.equal(formatStrengthSet(bodyweightExercise[5], { reps: "6", weight: "25" }), "+25×6");
 
 const curlDrop = { n: "Supinated EZ Bar Curl", ws: "3", r: "15/15", note: "DROPSET. DROP WEIGHT BY ~50% ON SECOND 15 REPS." };
 assert.deepEqual(dropSetPrescription(curlDrop), { workingReps: "15", dropReps: "15", ratio: 0.5 });
+assert.deepEqual(repSegmentTargets(curlDrop), []);
+assert.deepEqual(repSegmentTargets({ r: "7/7/7" }), ["7", "7", "7"]);
+assert.deepEqual(repSegmentTargets({ r: "10+2" }), ["10", "2"]);
+assert.deepEqual(repSegmentTargets({ r: "3-5" }), []);
+const curlPhases = setRepSegments({ kind: SET_KINDS.WORKING, done: true, weight: "40" }, ["7", "7", "6"]);
+assert.equal(curlPhases.reps, "20");
+assert.equal(setReps(curlPhases), 20);
+assert.equal(completedWorkingSetCount([curlPhases]), 1);
+assert.equal(setReps(setRepSegments(curlPhases, ["7", "", "6"])), 0);
 const clusteredSets = [
   { kind: SET_KINDS.WORKING, clusterId: "c1", segmentIndex: 0, weight: "40", reps: "15", done: true },
   { kind: SET_KINDS.DROP, clusterId: "c1", segmentIndex: 1, weight: "20", reps: "15", done: true },
@@ -134,6 +158,13 @@ assert.equal(rowsToCsv(["name", "value"], [{ name: "Squat", value: 100 }]), "\uF
 const workoutRows = workoutCsvRows({ profile: { name: "Alex" }, plans: [plan], workoutLogs: logs, resolveIdentity: resolveWorkoutLogIdentity });
 assert.equal(workoutRows.find((row) => row.exercise === "Squat").week, 1);
 assert.equal(workoutRows.find((row) => row.exercise === "Squat").day, 1);
+const segmentedExport = workoutCsvRows({
+  profile: { name: "Alex" }, plans: [plan],
+  workoutLogs: { [squatKey]: { sessions: [{ date, sets: [curlPhases] }] } },
+  resolveIdentity: resolveWorkoutLogIdentity,
+});
+assert.equal(segmentedExport[0].reps, "20");
+assert.equal(segmentedExport[0].rep_segments, "7/7/6");
 
 const storedData = {
   "theforge:profiles": JSON.stringify([{ id: "p1", name: "Alex" }]),
@@ -309,4 +340,5 @@ const compatibilityDocument = await getDocument({
 const compatibilityText = await (await compatibilityDocument.getPage(1)).getTextContent();
 assert.equal(compatibilityText.items.some((item) => item.str === "Safari compatible"), true);
 
+await import("./recipe-tests.mjs");
 console.log("Core workout and timer tests passed.");
