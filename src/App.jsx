@@ -1520,23 +1520,29 @@ function formatTimer(seconds) {
 }
 
 function WorkoutCompleteCelebration({ workout, onDone }) {
-  return (
-    <div style={{ ...styles.modalOverlay, justifyContent: "center", zIndex: 80 }} role="dialog" aria-modal="true" aria-label="Workout complete">
+  // Escape the animated tab's stacking context and the workout scroll container.
+  return createPortal(
+    <div style={{ ...styles.modalOverlay, ...styles.completionOverlay }} role="dialog" aria-modal="true" aria-label="Workout complete">
       <div style={styles.completionSheet}>
-        <div aria-hidden="true" style={styles.completionBurst}>
-          <div style={styles.completionStamp}><Check size={48} strokeWidth={3} /></div>
+        <div style={styles.completionBody} role="region" aria-label="Workout summary" tabIndex={0}>
+          <div aria-hidden="true" style={styles.completionBurst}>
+            <div style={styles.completionStamp}><Check size={48} strokeWidth={3} /></div>
+          </div>
+          <div style={styles.completionKicker}>Forged today</div>
+          <div style={styles.completionTitle}>Workout Complete</div>
+          <div style={styles.completionSubtitle}>{workout.focus || workout.dayName}</div>
+          <div style={styles.completionStats}>
+            <div><span style={styles.completionStatValue}>{workout.exercises}</span><span style={styles.dimLabel}>exercises</span></div>
+            <div><span style={styles.completionStatValue}>{workout.dayName}</span><span style={styles.dimLabel}>{workout.planName}</span></div>
+          </div>
+          <div style={styles.helpNote}>Effort logged. Progress secured. The next workout is ready when you are.</div>
         </div>
-        <div style={styles.completionKicker}>Forged today</div>
-        <div style={styles.completionTitle}>Workout Complete</div>
-        <div style={styles.completionSubtitle}>{workout.focus || workout.dayName}</div>
-        <div style={styles.completionStats}>
-          <div><span style={styles.completionStatValue}>{workout.exercises}</span><span style={styles.dimLabel}>exercises</span></div>
-          <div><span style={styles.completionStatValue}>{workout.dayName}</span><span style={styles.dimLabel}>{workout.planName}</span></div>
+        <div style={styles.completionFooter}>
+          <button autoFocus style={{ ...styles.primaryButton, width: "100%" }} onClick={onDone}>Done</button>
         </div>
-        <div style={styles.helpNote}>Effort logged. Progress secured. The next workout is ready when you are.</div>
-        <button autoFocus style={{ ...styles.primaryButton, width: "100%", marginTop: 12 }} onClick={onDone}>Done</button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -4135,7 +4141,10 @@ const styles = {
   loadingText: { color: COLORS.textDim, fontFamily: FONT_BODY },
   content: { flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch", overscrollBehaviorY: "contain", touchAction: "pan-y", paddingBottom: "calc(76px + env(safe-area-inset-bottom))", background: "linear-gradient(180deg, rgba(255,255,255,0.018), rgba(255,255,255,0) 22%)" },
   tabScene: { animation: "tabSceneIn 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both" },
-  completionSheet: { width: "min(390px, calc(100vw - 28px))", background: "radial-gradient(circle at 50% 18%, rgba(233,166,66,.2), transparent 38%), #171A1E", border: "1px solid rgba(233,166,66,.45)", borderRadius: 22, padding: "28px 22px 22px", textAlign: "center", boxShadow: "0 28px 90px rgba(0,0,0,.65)", animation: "tabSceneIn 260ms ease both" },
+  completionOverlay: { height: "100dvh", alignItems: "center", justifyContent: "center", padding: "calc(14px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left))", color: COLORS.text, fontFamily: FONT_BODY },
+  completionSheet: { width: "min(390px, 100%)", maxHeight: "100%", minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden", background: "radial-gradient(circle at 50% 18%, rgba(233,166,66,.2), transparent 38%), #171A1E", border: "1px solid rgba(233,166,66,.45)", borderRadius: 22, textAlign: "center", boxShadow: "0 28px 90px rgba(0,0,0,.65)", animation: "tabSceneIn 260ms ease both" },
+  completionBody: { minHeight: 0, overflowY: "auto", overscrollBehaviorY: "contain", WebkitOverflowScrolling: "touch", padding: "28px 22px 4px", overflowWrap: "anywhere" },
+  completionFooter: { flexShrink: 0, padding: "8px 22px 22px" },
   completionBurst: { display: "flex", justifyContent: "center", marginBottom: 18 },
   completionStamp: { width: 94, height: 94, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.bg, background: `linear-gradient(145deg, #F7BE65, ${COLORS.amber})`, border: "5px double rgba(16,18,20,.72)", animation: "forgeStamp 560ms cubic-bezier(.2,.9,.2,1) both, forgeGlow 1.8s ease-in-out infinite" },
   completionKicker: { color: COLORS.amber, fontSize: 12, fontWeight: 800, letterSpacing: ".16em", textTransform: "uppercase" },
