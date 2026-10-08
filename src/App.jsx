@@ -2887,6 +2887,9 @@ function CustomFoodForm({ onSelect }) {
 
 // ============ WEIGHT TAB ============
 function WeightChart({ sorted, goalWeight }) {
+  const [selectedIndex, setSelectedIndex] = useState(sorted.length - 1);
+  const activeIndex = Math.min(Math.max(selectedIndex, 0), sorted.length - 1);
+  const active = sorted[activeIndex];
   const W = 360, H = 190;
   const ml = 40, mt = 18, mr = 14, mb = 34;
   const cw = W - ml - mr, ch = H - mt - mb;
@@ -2914,8 +2917,16 @@ function WeightChart({ sorted, goalWeight }) {
   const gw = goalWeight != null ? Number(goalWeight) : null;
   const gwY = gw != null ? yOf(gw) : null;
 
+  function selectAt(clientX, target) {
+    const bounds = target.getBoundingClientRect();
+    const svgX = ((clientX - bounds.left) / bounds.width) * W;
+    const index = sorted.length > 1 ? Math.round(((svgX - ml) / cw) * (sorted.length - 1)) : 0;
+    setSelectedIndex(Math.max(0, Math.min(sorted.length - 1, index)));
+  }
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", marginTop: 8 }}>
+    <div>
+    <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Weight chart. Selected ${active.date}: ${active.lbs} pounds.`} onPointerMove={(event) => selectAt(event.clientX, event.currentTarget)} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); selectAt(event.clientX, event.currentTarget); }} style={{ width: "100%", height: "auto", display: "block", marginTop: 8, touchAction: "pan-y" }}>
       <defs>
         <linearGradient id="wAreaGrad" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={COLORS.blue} stopOpacity="0.22" />
@@ -2936,8 +2947,9 @@ function WeightChart({ sorted, goalWeight }) {
         <polyline points={linePts} fill="none" stroke={COLORS.blue} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
       )}
       {sorted.map((w, i) => (
-        <circle key={i} cx={xOf(i).toFixed(1)} cy={yOf(w.lbs).toFixed(1)} r="3.5" fill={COLORS.blue} stroke={COLORS.bg} strokeWidth="2" />
+        <circle key={i} cx={xOf(i).toFixed(1)} cy={yOf(w.lbs).toFixed(1)} r={i === activeIndex ? "5" : "3.5"} fill={COLORS.blue} stroke={i === activeIndex ? COLORS.amber : COLORS.bg} strokeWidth="2" />
       ))}
+      <line x1={xOf(activeIndex)} y1={mt} x2={xOf(activeIndex)} y2={mt + ch} stroke={COLORS.blue} strokeDasharray="3 3" opacity="0.6" />
       {yTicks.map((v, i) => (
         <text key={i} x={ml - 5} y={(yOf(v) + 4).toFixed(1)} fill={COLORS.textDim} fontSize="10" textAnchor="end">{Math.round(v)}</text>
       ))}
@@ -2945,6 +2957,9 @@ function WeightChart({ sorted, goalWeight }) {
         <text key={i} x={xOf(i).toFixed(1)} y={H - 6} fill={COLORS.textDim} fontSize="10" textAnchor="middle">{sorted[i].date.slice(5)}</text>
       ))}
     </svg>
+    <div style={{ ...styles.helpNote, textAlign: "center", marginTop: 2 }} aria-live="polite">{active.date} · {active.lbs} lbs</div>
+    {sorted.length > 1 && <input type="range" min="0" max={sorted.length - 1} value={activeIndex} onChange={(event) => setSelectedIndex(Number(event.target.value))} aria-label="Weight chart entry" style={{ width: "100%", accentColor: COLORS.amber, marginTop: 8 }} />}
+    </div>
   );
 }
 
@@ -3406,18 +3421,18 @@ function formatMeasurementValue(m) {
   return m.kind === "mass" ? `${value} ${m.unit} mass` : `${value} ${m.unit}`;
 }
 
-function BodyTab({ uiPrefs = {}, setUiPrefs, workoutLogs, plans, profile, setProfiles, weights, addWeightEntry, saveGoalWeight, measurements, addMeasurementEntry, bodyScans, saveBodyScan, removeBodyScan, onGoTrain }) {
+function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightEntry, saveGoalWeight, measurements, addMeasurementEntry, bodyScans, saveBodyScan, removeBodyScan, onGoTrain }) {
   const [side, setSide] = useState("front");
   const [bodyMode, setBodyMode] = useState("training");
   const [windowDays, setWindowDays] = useState(7);
   const [muscleWindowDays, setMuscleWindowDays] = useState(7);
-  const [measurementsOpen, setMeasurementsOpen] = useState(() => Boolean(uiPrefs.bodyMeasurementsOpen));
-  const [weightTrendOpen, setWeightTrendOpen] = useState(() => Boolean(uiPrefs.bodyWeightTrendOpen));
-  const [scansOpen, setScansOpen] = useState(() => Boolean(uiPrefs.bodyScansOpen));
-  const [mapOpen, setMapOpen] = useState(() => Boolean(uiPrefs.bodyMapOpen));
+  const [bodySection, setBodySection] = useState("weight");
+  const [weightHistoryOpen, setWeightHistoryOpen] = useState(false);
+  const [goalEditing, setGoalEditing] = useState(false);
   const [weightVal, setWeightVal] = useState("");
   const [weightError, setWeightError] = useState("");
   const [goalInput, setGoalInput] = useState(profile.goalWeight ?? "");
+  const [goalError, setGoalError] = useState("");
   const [measurePart, setMeasurePart] = useState("Waist");
   const [measureKind, setMeasureKind] = useState("circumference");
   const [measureVal, setMeasureVal] = useState("");
@@ -3429,7 +3444,6 @@ function BodyTab({ uiPrefs = {}, setUiPrefs, workoutLogs, plans, profile, setPro
   const [scanImporting, setScanImporting] = useState(false);
   const scanFileRef = useRef(null);
   const weightInputRef = useRef(null);
-  const measurementsCardRef = useRef(null);
   const gender = profile.gender || "male";
   const heat = computeHeatmap(workoutLogs, plans, windowDays);
   const muscleHeat = computeHeatmap(workoutLogs, plans, muscleWindowDays);
@@ -3441,8 +3455,7 @@ function BodyTab({ uiPrefs = {}, setUiPrefs, workoutLogs, plans, profile, setPro
   const ranked = Object.entries(muscleHeat).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   function setGender(g) { setProfiles((prev) => prev.map((p) => p.id === profile.id ? { ...p, gender: g } : p)); }
   const sortedWeights = [...(weights || [])].sort((a, b) => a.date.localeCompare(b.date));
-  const latestWeight = sortedWeights[sortedWeights.length - 1], priorWeight = sortedWeights[sortedWeights.length - 2];
-  const weightDelta = latestWeight && priorWeight ? latestWeight.lbs - priorWeight.lbs : null;
+  const latestWeight = sortedWeights[sortedWeights.length - 1];
   const normalizedMeasurements = (measurements || []).map(normalizeMeasurement);
   const latestMetrics = BODY_MEASUREMENTS.flatMap((part) => Object.keys(MEASUREMENT_KINDS).map((kind) => {
     const rows = normalizedMeasurements.filter((m) => m.part === part && m.kind === kind).sort((a, b) => a.date.localeCompare(b.date));
@@ -3452,7 +3465,7 @@ function BodyTab({ uiPrefs = {}, setUiPrefs, workoutLogs, plans, profile, setPro
   const measureUnit = MEASUREMENT_KINDS[measureKind].unit;
   const sortedScans = [...(bodyScans || [])].sort((a, b) => a.scanDate.localeCompare(b.scanDate));
   const latestScan = sortedScans[sortedScans.length - 1];
-  useEffect(() => { setUiPrefs?.((prev) => ({ ...prev, bodyMeasurementsOpen: measurementsOpen, bodyWeightTrendOpen: weightTrendOpen, bodyScansOpen: scansOpen, bodyMapOpen: mapOpen })); }, [measurementsOpen, weightTrendOpen, scansOpen, mapOpen, setUiPrefs]);
+  useEffect(() => { setGoalInput(profile.goalWeight ?? ""); }, [profile.goalWeight]);
   async function chooseScanFile(event) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -3539,18 +3552,25 @@ function BodyTab({ uiPrefs = {}, setUiPrefs, workoutLogs, plans, profile, setPro
     setWeightVal("");
   }
 
+  function openWeightEntry() {
+    setBodySection("weight");
+    window.requestAnimationFrame(() => weightInputRef.current?.focus());
+  }
+
   return (
     <div style={styles.tabContent}>
       <div style={styles.screenTitle}>Body</div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }} aria-label="Body quick actions">
-        <button type="button" style={styles.primaryButtonSm} onClick={() => weightInputRef.current?.focus()}><Scale size={14} style={{ verticalAlign: "-2px", marginRight: 5 }} />Log weight</button>
-        <button type="button" style={styles.secondaryButton} onClick={() => { setMeasurementsOpen(true); measurementsCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>Measurements</button>
-        <button type="button" style={styles.secondaryButton} onClick={() => scanFileRef.current?.click()}>Import scan</button>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }} aria-label="Body sections">
+        <button type="button" aria-pressed={bodySection === "weight"} style={bodySection === "weight" ? styles.primaryButtonSm : styles.secondaryButton} onClick={openWeightEntry}><Scale size={14} style={{ verticalAlign: "-2px", marginRight: 5 }} />Log weight</button>
+        <button type="button" aria-pressed={bodySection === "measurements"} style={bodySection === "measurements" ? styles.primaryButtonSm : styles.secondaryButton} onClick={() => setBodySection("measurements")}>Measurements</button>
+        <button type="button" aria-pressed={bodySection === "scans"} style={bodySection === "scans" ? styles.primaryButtonSm : styles.secondaryButton} onClick={() => setBodySection("scans")}>Scans &amp; composition</button>
+        <button type="button" aria-pressed={bodySection === "map"} style={bodySection === "map" ? styles.primaryButtonSm : styles.secondaryButton} onClick={() => setBodySection("map")}>Body map &amp; training</button>
+        <button type="button" style={styles.secondaryButton} onClick={() => { setBodySection("scans"); scanFileRef.current?.click(); }}>Import scan</button>
       </div>
       <input ref={scanFileRef} type="file" accept="application/pdf,.pdf" hidden onChange={chooseScanFile} />
 
-      <div style={styles.card}>
+      {bodySection === "weight" && <div style={styles.card}>
         <div style={styles.cardHeader}>Weight</div>
         <div style={styles.dimLabel}>Today · {todayKey()}</div>
         <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginTop: 8 }}>
@@ -3561,29 +3581,26 @@ function BodyTab({ uiPrefs = {}, setUiPrefs, workoutLogs, plans, profile, setPro
         <div style={{ ...styles.helpNote, marginTop: 9 }}>{latestWeight ? `Latest logged: ${latestWeight.lbs} lbs on ${latestWeight.date}${latestWeight.date === todayKey() ? " · today's entry" : ""}` : "No weight logged yet."}</div>
         <div style={{ ...styles.weightSummaryGrid, marginTop: 8 }}>
           <div style={styles.weightSummaryTile}><div style={styles.weightSummaryLabel}>Current</div><div style={styles.weightSummaryValue}>{latestWeight ? latestWeight.lbs : "—"}<span style={styles.weightSummaryUnit}> lbs</span></div></div>
-          <div style={styles.weightSummaryTile}><div style={styles.weightSummaryLabel}>Goal</div><div style={styles.weightSummaryValue}>{profile.goalWeight ?? "—"}<span style={styles.weightSummaryUnit}> lbs</span></div></div>
-        </div>
-        {sortedWeights.length >= 2 && <svg viewBox="0 0 180 36" role="img" aria-label="Recent weight trend" style={{ width: "100%", height: 36, marginTop: 10 }}>
-          <polyline fill="none" stroke={COLORS.blue} strokeWidth="2" points={sortedWeights.slice(-12).map((entry, index, values) => `${(index / Math.max(1, values.length - 1)) * 176 + 2},${34 - ((entry.lbs - Math.min(...values.map((item) => item.lbs))) / Math.max(0.1, Math.max(...values.map((item) => item.lbs)) - Math.min(...values.map((item) => item.lbs)))) * 28}`).join(" ")} />
-        </svg>}
-        <button type="button" aria-expanded={weightTrendOpen} style={{ ...styles.collapsibleHeader, marginTop: 12 }} onClick={() => setWeightTrendOpen((v) => !v)}>
-          <span>Weight trend, goal &amp; history</span><span style={styles.collapsibleMeta}>{sortedWeights.length ? `${sortedWeights.length} log${sortedWeights.length === 1 ? "" : "s"}` : "No history"}</span>{weightTrendOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-        </button>
-        {weightTrendOpen && <div style={{ marginTop: 10 }}>
-          {sortedWeights.length > 0 ? <WeightChart sorted={sortedWeights} goalWeight={profile.goalWeight} /> : <div style={styles.emptyHint}>Log weight to start your trend.</div>}
-          <div style={styles.weightControlGrid}>
-            <div><label htmlFor="body-goal-lbs" style={styles.fieldLabel}>Goal weight (lbs)</label><input id="body-goal-lbs" type="number" min="0.1" step="0.1" inputMode="decimal" placeholder="Goal lbs" value={goalInput} onChange={(e) => setGoalInput(e.target.value)} style={styles.input} /></div>
-            <button type="button" style={styles.primaryButton} onClick={() => saveGoalWeight(goalInput === "" ? null : Number(goalInput))}>Set goal</button>
+          <div style={styles.weightSummaryTile}>
+            <div style={styles.weightSummaryLabel}>Goal</div>
+            {goalEditing ? <div style={{ display: "grid", gap: 6 }}>
+              <input aria-label="Goal weight in pounds" type="number" min="0.1" step="0.1" inputMode="decimal" value={goalInput} onChange={(event) => { setGoalInput(event.target.value); setGoalError(""); }} style={{ ...styles.input, minWidth: 0, width: "100%" }} />
+              <button type="button" style={styles.primaryButtonSm} onClick={() => { const goal = Number(goalInput); if (goalInput !== "" && (!Number.isFinite(goal) || goal <= 0 || goal > 1000)) { setGoalError("Enter a goal between 0 and 1,000 pounds."); return; } saveGoalWeight(goalInput === "" ? null : goal); setGoalEditing(false); }}>Save</button>
+            </div> : <div style={styles.weightSummaryValue}>{profile.goalWeight ?? "—"}<span style={styles.weightSummaryUnit}> lbs</span></div>}
+            {goalError && <div role="alert" style={{ ...styles.helpNote, color: COLORS.red }}>{goalError}</div>}
+            <button type="button" style={{ ...styles.linkButton, marginTop: 7, padding: 0 }} onClick={() => { setGoalInput(profile.goalWeight ?? ""); setGoalError(""); setGoalEditing((value) => !value); }}>{goalEditing ? "Cancel" : profile.goalWeight == null ? "Set goal" : "Update goal"}</button>
           </div>
-          {sortedWeights.slice().reverse().map((entry) => <div key={entry.date} style={styles.scanHistoryRow}><span>{entry.date}</span><span style={{ ...styles.tabularNum, marginLeft: "auto" }}>{entry.lbs} lbs</span></div>)}
-        </div>}
-      </div>
-
-      <div style={styles.card}>
-        <button type="button" aria-expanded={scansOpen} style={styles.collapsibleHeader} onClick={() => setScansOpen((v) => !v)}>
-          <span>Scans &amp; composition</span><span style={styles.collapsibleMeta}>{latestScan ? `Latest ${latestScan.scanDate}${(() => { const fat = latestScan.metrics?.find((m) => m.code === "body_fat_percent"); const lean = latestScan.metrics?.find((m) => m.code === "lean_body_mass"); return fat || lean ? ` · ${fat ? `${displayMetricValue(fat)} fat` : ""}${fat && lean ? " · " : ""}${lean ? `${displayMetricValue(lean)} lean` : ""}` : ""; })()}` : "No scans yet"}</span>{scansOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        </div>
+        <div style={{ ...styles.cardHeader, marginTop: 14 }}>Weight trend</div>
+        {sortedWeights.length > 0 ? <WeightChart sorted={sortedWeights} goalWeight={profile.goalWeight} /> : <div style={styles.emptyHint}>Log weight to start your trend.</div>}
+        <button type="button" aria-expanded={weightHistoryOpen} style={{ ...styles.collapsibleHeader, marginTop: 16 }} onClick={() => setWeightHistoryOpen((value) => !value)}>
+          <span>Weight entries</span><span style={styles.collapsibleMeta}>{sortedWeights.length} logs</span>{weightHistoryOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
         </button>
-        {scansOpen && <div style={{ marginTop: 12 }}>
+        {weightHistoryOpen && <div style={{ marginTop: 10, maxHeight: 320, overflowY: "auto" }}>{sortedWeights.slice().reverse().map((entry) => <div key={entry.date} style={styles.scanHistoryRow}><span>{entry.date}</span><span style={{ ...styles.tabularNum, marginLeft: "auto" }}>{entry.lbs} lbs</span></div>)}</div>}
+      </div>}
+
+      {bodySection === "scans" && <div style={styles.card}>
+        <div>
         <div style={styles.scanHeader}>
           <div>
             <div style={styles.cardHeader}>Body Composition</div>
@@ -3640,15 +3657,13 @@ function BodyTab({ uiPrefs = {}, setUiPrefs, workoutLogs, plans, profile, setPro
             )}
           </>
         )}
-        {scansOpen && <RecompositionStory weights={sortedWeights} scans={sortedScans} />}
-        </div>}
-      </div>
+        <RecompositionStory weights={sortedWeights} scans={sortedScans} />
+        </div>
+      </div>}
 
-      <div style={styles.card}>
-        <button type="button" aria-expanded={mapOpen} style={styles.collapsibleHeader} onClick={() => setMapOpen((v) => !v)}>
-          <span>Body map &amp; training coverage</span><span style={styles.collapsibleMeta}>{ranked.length ? `${ranked.length} muscles covered` : "No training data"}</span>{mapOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-        </button>
-        {mapOpen && <div style={{ marginTop: 12 }}>
+      {bodySection === "map" && <div style={styles.card}>
+        <div style={styles.cardHeader}>Body map &amp; training coverage</div>
+        <div style={{ marginTop: 12 }}>
         {latestScan && (
           <div style={{ ...styles.compactModeSwitch, width: "100%", marginTop: 0, marginBottom: 8 }}>
             <button style={{ ...styles.compactModeButton, ...(bodyMode === "training" ? styles.compactModeButtonOn : {}) }} onClick={() => setBodyMode("training")}>Training</button>
@@ -3720,14 +3735,12 @@ function BodyTab({ uiPrefs = {}, setUiPrefs, workoutLogs, plans, profile, setPro
           {ranked.map(([z, v]) => <div key={z} style={styles.zoneStatRow}><div style={{ width: 10, height: 10, borderRadius: 2, background: heatColor(v / muscleMax) }} /><span style={{ flex: 1, textTransform: "capitalize", fontSize: 14 }}>{z}</span><span style={styles.tabularNum}>{Math.round(v)}</span></div>)}
           <div style={{ ...styles.helpNote, marginTop: 6 }}>Working-set volume by muscle for the selected window.</div>
         </div>}
-        </div>}
-      </div>
+        </div>
+      </div>}
 
-      <div ref={measurementsCardRef} style={styles.card}>
-        <button type="button" aria-expanded={measurementsOpen} style={styles.collapsibleHeader} onClick={() => setMeasurementsOpen((v) => !v)}>
-          <span>Measurements</span><span style={styles.collapsibleMeta}>{latestMetrics.length ? `${latestMetrics.length} measurement${latestMetrics.length === 1 ? "" : "s"}` : "No measurements"}</span>{measurementsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-        </button>
-        {measurementsOpen && <div style={{ marginTop: 12 }}>
+      {bodySection === "measurements" && <div style={styles.card}>
+        <div style={styles.cardHeader}>Measurements</div>
+        <div style={{ marginTop: 12 }}>
           <div style={styles.inlineMeasurePanel}>
             <div style={styles.inlineMeasureTitle}>Add Measurement</div>
             <div style={styles.measureInputGrid}>
@@ -3742,8 +3755,8 @@ function BodyTab({ uiPrefs = {}, setUiPrefs, workoutLogs, plans, profile, setPro
             <button type="button" style={{ ...styles.primaryButton, width: "100%", marginTop: 8 }} onClick={() => { logMeasurement(measurePart, measureKind, measureVal); setMeasureVal(""); }}>Log Measurement</button>
           </div>
           {latestMetrics.length > 0 && latestMetrics.map((m) => <div key={`${m.part}-${m.kind}`} style={styles.measureRow}><span>{m.part}</span><span style={styles.tabularNum}>{formatMeasurementValue(m.latest)}</span><span style={{ ...styles.dimLabel, color: m.delta == null ? COLORS.textDim : m.delta > 0 ? COLORS.amber : COLORS.blue }}>{m.delta == null ? "new" : `${m.delta > 0 ? "+" : ""}${m.delta.toFixed(1)}`}</span></div>)}
-        </div>}
-      </div>
+        </div>
+      </div>}
 
       {scanReview && <EvoltImportReview review={scanReview} setReview={setScanReview} busy={scanImporting} onCancel={() => setScanReview(null)} onConfirm={confirmScanImport} />}
     </div>

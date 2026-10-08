@@ -112,21 +112,38 @@ test("combined reps save each phase in list and guided modes", async ({ page }) 
   })).toEqual({ phases: ["7", "7", "5", "1"], total: "20" });
 });
 
-test("body quick actions reach weight and measurements", async ({ page }) => {
-  await seed(page);
+test("body sections, weight history, goal, and chart selection", async ({ page }) => {
+  await seed(page, { extra: { "p:qa-profile:weights": [{ date: "2026-07-18", lbs: 182 }, { date: "2026-07-20", lbs: 181 }] } });
   await page.goto("./");
   await page.getByRole("button", { name: "Body", exact: true }).click();
   await expect(page.getByRole("button", { name: "Log weight" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Weight entries/ })).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByText("2026-07-18 · 182 lbs")).toBeHidden();
+  await page.getByRole("slider", { name: "Weight chart entry" }).fill("0");
+  await expect(page.getByText("2026-07-18 · 182 lbs")).toBeVisible();
+  const chart = page.getByRole("img", { name: /Weight chart/ });
+  const bounds = await chart.boundingBox();
+  await chart.click({ position: { x: bounds.width - 14, y: bounds.height / 2 } });
+  await expect(page.getByText("2026-07-20 · 181 lbs")).toBeVisible();
+  await page.getByRole("button", { name: /Weight entries/ }).click();
+  await expect(page.getByRole("button", { name: /Weight entries/ })).toHaveAttribute("aria-expanded", "true");
+  await page.getByRole("button", { name: "Set goal" }).click();
+  await page.getByRole("spinbutton", { name: "Goal weight in pounds" }).fill("175");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Update goal" })).toBeVisible();
   await page.getByRole("button", { name: "Log weight" }).click();
   await expect(page.locator("#body-weight-lbs")).toBeFocused();
   await page.locator("#body-weight-lbs").fill("180.5");
   await page.getByRole("button", { name: "Log", exact: true }).click();
   await expect(page.getByText(/Latest logged: 180.5 lbs/)).toBeVisible();
   await page.getByRole("button", { name: "Measurements", exact: true }).first().click();
-  await expect(page.getByRole("button", { name: /Measurements.*measurement/ })).toHaveAttribute("aria-expanded", "true");
-  await page.reload();
-  await page.getByRole("button", { name: "Body", exact: true }).click();
-  await expect(page.getByRole("button", { name: /Measurements.*measurement/ })).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByText("Add Measurement")).toBeVisible();
+  await expect(page.locator("#body-weight-lbs")).toBeHidden();
+  await page.getByRole("button", { name: "Body map & training" }).click();
+  await expect(page.getByText("Sets by muscle")).toBeVisible();
+  await page.getByRole("button", { name: "Scans & composition" }).click();
+  await expect(page.getByText("Body Composition")).toBeVisible();
+  await page.getByRole("button", { name: "Log weight" }).click();
   await expect(page.getByText(/Latest logged: 180.5 lbs/)).toBeVisible();
   const chooser = page.waitForEvent("filechooser");
   await page.getByRole("button", { name: "Import scan" }).click();
