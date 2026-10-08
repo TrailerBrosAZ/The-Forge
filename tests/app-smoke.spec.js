@@ -117,6 +117,8 @@ test("body sections, weight history, goal, and chart selection", async ({ page }
   await page.goto("./");
   await page.getByRole("button", { name: "Body", exact: true }).click();
   await expect(page.getByRole("button", { name: "Log weight" })).toBeVisible();
+  const sectionRows = await page.locator('[aria-label="Body sections"] > button').evaluateAll((buttons) => [...new Set(buttons.map((button) => Math.round(button.getBoundingClientRect().top)))]);
+  expect(sectionRows).toHaveLength(2);
   await expect(page.getByRole("button", { name: /Weight entries/ })).toHaveAttribute("aria-expanded", "false");
   await expect(page.getByText("2026-07-18 · 182 lbs")).toBeHidden();
   await page.getByRole("slider", { name: "Weight chart entry" }).fill("0");
@@ -145,8 +147,9 @@ test("body sections, weight history, goal, and chart selection", async ({ page }
   await expect(page.getByText("Body Composition")).toBeVisible();
   await page.getByRole("button", { name: "Log weight" }).click();
   await expect(page.getByText(/Latest logged: 180.5 lbs/)).toBeVisible();
+  await page.getByRole("button", { name: "Scans & composition" }).click();
   const chooser = page.waitForEvent("filechooser");
-  await page.getByRole("button", { name: "Import scan" }).click();
+  await page.getByRole("button", { name: "Import PDF" }).click();
   expect((await chooser).isMultiple()).toBe(false);
 });
 

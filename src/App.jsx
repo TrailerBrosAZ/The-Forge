@@ -3561,12 +3561,11 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
     <div style={styles.tabContent}>
       <div style={styles.screenTitle}>Body</div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }} aria-label="Body sections">
-        <button type="button" aria-pressed={bodySection === "weight"} style={bodySection === "weight" ? styles.primaryButtonSm : styles.secondaryButton} onClick={openWeightEntry}><Scale size={14} style={{ verticalAlign: "-2px", marginRight: 5 }} />Log weight</button>
-        <button type="button" aria-pressed={bodySection === "measurements"} style={bodySection === "measurements" ? styles.primaryButtonSm : styles.secondaryButton} onClick={() => setBodySection("measurements")}>Measurements</button>
-        <button type="button" aria-pressed={bodySection === "scans"} style={bodySection === "scans" ? styles.primaryButtonSm : styles.secondaryButton} onClick={() => setBodySection("scans")}>Scans &amp; composition</button>
-        <button type="button" aria-pressed={bodySection === "map"} style={bodySection === "map" ? styles.primaryButtonSm : styles.secondaryButton} onClick={() => setBodySection("map")}>Body map &amp; training</button>
-        <button type="button" style={styles.secondaryButton} onClick={() => { setBodySection("scans"); scanFileRef.current?.click(); }}>Import scan</button>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8, marginBottom: 12 }} aria-label="Body sections">
+        <button type="button" aria-pressed={bodySection === "weight"} style={{ ...(bodySection === "weight" ? styles.primaryButtonSm : styles.secondaryButton), ...styles.bodySectionButton }} onClick={openWeightEntry}>Log weight</button>
+        <button type="button" aria-pressed={bodySection === "measurements"} style={{ ...(bodySection === "measurements" ? styles.primaryButtonSm : styles.secondaryButton), ...styles.bodySectionButton }} onClick={() => setBodySection("measurements")}>Measurements</button>
+        <button type="button" aria-pressed={bodySection === "scans"} style={{ ...(bodySection === "scans" ? styles.primaryButtonSm : styles.secondaryButton), ...styles.bodySectionButton }} onClick={() => setBodySection("scans")}>Scans &amp; composition</button>
+        <button type="button" aria-pressed={bodySection === "map"} style={{ ...(bodySection === "map" ? styles.primaryButtonSm : styles.secondaryButton), ...styles.bodySectionButton }} onClick={() => setBodySection("map")}>Body map &amp; training</button>
       </div>
       <input ref={scanFileRef} type="file" accept="application/pdf,.pdf" hidden onChange={chooseScanFile} />
 
@@ -3588,7 +3587,7 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
               <button type="button" style={styles.primaryButtonSm} onClick={() => { const goal = Number(goalInput); if (goalInput !== "" && (!Number.isFinite(goal) || goal <= 0 || goal > 1000)) { setGoalError("Enter a goal between 0 and 1,000 pounds."); return; } saveGoalWeight(goalInput === "" ? null : goal); setGoalEditing(false); }}>Save</button>
             </div> : <div style={styles.weightSummaryValue}>{profile.goalWeight ?? "—"}<span style={styles.weightSummaryUnit}> lbs</span></div>}
             {goalError && <div role="alert" style={{ ...styles.helpNote, color: COLORS.red }}>{goalError}</div>}
-            <button type="button" style={{ ...styles.linkButton, marginTop: 7, padding: 0 }} onClick={() => { setGoalInput(profile.goalWeight ?? ""); setGoalError(""); setGoalEditing((value) => !value); }}>{goalEditing ? "Cancel" : profile.goalWeight == null ? "Set goal" : "Update goal"}</button>
+            <button type="button" style={goalEditing ? { ...styles.linkButton, marginTop: 7, padding: 0 } : { ...styles.primaryButtonSm, width: "100%", marginTop: 9 }} onClick={() => { setGoalInput(profile.goalWeight ?? ""); setGoalError(""); setGoalEditing((value) => !value); }}>{goalEditing ? "Cancel" : profile.goalWeight == null ? "Set goal" : "Update goal"}</button>
           </div>
         </div>
         <div style={{ ...styles.cardHeader, marginTop: 14 }}>Weight trend</div>
@@ -4380,6 +4379,7 @@ const styles = {
   detailFilterRow: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginTop: 10 },
   detailFilterBtn: { height: 32, borderRadius: 8, border: `1px solid ${COLORS.cardBorder}`, background: COLORS.bg, color: COLORS.textDim, fontFamily: FONT_BODY, fontSize: 12, cursor: "pointer" },
   detailFilterBtnOn: { background: COLORS.amber, borderColor: COLORS.amber, color: COLORS.bg, fontWeight: 700 },
+  bodySectionButton: { width: "100%", minHeight: 46, whiteSpace: "normal", padding: "8px 6px", fontSize: 13, lineHeight: 1.2 },
   zoneStatRow: { display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: `1px solid ${COLORS.cardBorder}` },
   weightSummaryGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 },
   weightSummaryTile: { background: COLORS.bg, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 10, padding: 10 },
