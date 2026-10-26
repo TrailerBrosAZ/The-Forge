@@ -1,0 +1,37 @@
+.guided-exercise-viewport {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  touch-action: pan-y pinch-zoom;
+  isolation: isolate;
+}
+
+.guided-exercise-stage,
+.guided-exercise-preview {
+  top: 0;
+  left: 0;
+  width: 100%;
+  min-width: 0;
+  backface-visibility: hidden;
+}
+
+.guided-exercise-preview {
+  pointer-events: none;
+}
+
+.guided-exercise-viewport[data-phase="dragging"],
+.guided-exercise-viewport[data-phase="settling"] {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.guided-exercise-viewport[data-phase="dragging"] > div,
+.guided-exercise-viewport[data-phase="settling"] > div {
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guided-exercise-viewport > div {
+    transition: none !important;
+  }
+}
