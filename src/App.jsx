@@ -1734,7 +1734,35 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
   const [correctionIndex, setCorrectionIndex] = useState(null);
   const [correctionDraft, setCorrectionDraft] = useState(null);
   const [correctionError, setCorrectionError] = useState("");
+  const [navigationDirection, setNavigationDirection] = useState("next");
+  const touchStartRef = useRef(null);
   const restTimer = useDeadlineTimer(timerKey, parseRestSeconds(ex?.groupRest || ex?.rest));
+
+  const navigateToExercise = (nextIndex) => {
+    const boundedIndex = Math.max(0, Math.min(exercises.length - 1, nextIndex));
+    if (boundedIndex === activeIndex) return;
+    setNavigationDirection(boundedIndex > activeIndex ? "next" : "previous");
+    setActiveIndex(boundedIndex);
+  };
+  const onCardTouchStart = (event) => {
+    if (event.touches.length !== 1 || event.target.closest("button, input, select, textarea, a")) {
+      touchStartRef.current = null;
+      return;
+    }
+    const touch = event.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  };
+  const onCardTouchEnd = (event) => {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (!start || event.changedTouches.length !== 1) return;
+    const touch = event.changedTouches[0];
+    const horizontalDistance = touch.clientX - start.x;
+    const verticalDistance = touch.clientY - start.y;
+    if (Math.abs(horizontalDistance) < 56 || Math.abs(horizontalDistance) < Math.abs(verticalDistance) * 1.35) return;
+    navigateToExercise(activeIndex + (horizontalDistance < 0 ? 1 : -1));
+  };
+  const swipeHandlers = { onTouchStart: onCardTouchStart, onTouchEnd: onCardTouchEnd, onTouchCancel: () => { touchStartRef.current = null; } };
 
   useEffect(() => {
     const nextLog = ex ? getLog(ex, activeIndex) : null;
@@ -1765,11 +1793,9 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
       onSaveExercise(ex, [{ type: "cardio", duration: String(cardioDuration).trim(), intensity: String(cardioIntensity || "").trim(), done: true }], activeIndex);
     };
     return (
-      <div style={styles.guidedCard}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-          <div style={styles.dimLabel}>Exercise {progress}</div>
-          {completed && <span style={{ ...styles.badge, background: COLORS.green, color: COLORS.bg }}>Logged</span>}
-        </div>
+      <div className={`guided-exercise-stage guided-exercise-stage--${navigationDirection}`} key={ex.id || `${activeIndex}-${ex.n}`} style={styles.guidedExerciseStage} {...swipeHandlers}>
+        <div style={styles.guidedCard}>
+          <GuidedExerciseNavigation activeIndex={activeIndex} total={exercises.length} completed={completed} onNavigate={navigateToExercise} />
         <div style={styles.exTitle}>{titleCase(ex.n)}</div>
         <div style={styles.exPrescription}>{cardioSummary(ex)}</div>
         {lastSession && <div style={styles.exLastLine}>last: {cardioSummary(lastSession.sets?.[0] || {})}</div>}
@@ -1788,9 +1814,6 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
           {cardioError && <div role="alert" style={{ ...styles.dimLabel, color: COLORS.red, marginTop: 10 }}>{cardioError}</div>}
           <button style={{ ...styles.primaryButton, width: "100%", marginTop: 12 }} onClick={saveCardio}>{completed ? "Update Cardio" : "Complete Cardio"}</button>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button style={styles.secondaryButton} disabled={activeIndex === 0} onClick={() => setActiveIndex(Math.max(0, activeIndex - 1))}>Previous exercise</button>
-          <button style={styles.secondaryButton} disabled={activeIndex >= exercises.length - 1} onClick={() => setActiveIndex(Math.min(exercises.length - 1, activeIndex + 1))}>Next exercise</button>
         </div>
       </div>
     );
@@ -1893,7 +1916,7 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
       });
       if (sameRoundNext != null) {
         restTimer.clear();
-        setActiveIndex(sameRoundNext);
+        navigateToExercise(sameRoundNext);
         return;
       }
       const nextRoundMember = members.find((index) => {
@@ -1903,7 +1926,7 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
       });
       if (nextRoundMember != null) {
         restTimer.start(parseRestSeconds(ex.groupRest || ex.rest));
-        setActiveIndex(nextRoundMember);
+        navigateToExercise(nextRoundMember);
         return;
       }
     }
@@ -1912,16 +1935,14 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
       setSetIndex((i) => i + 1);
     } else if (activeIndex < exercises.length - 1) {
       restTimer.clear();
-      setActiveIndex(activeIndex + 1);
+      navigateToExercise(activeIndex + 1);
     }
   };
 
   return (
-    <div style={styles.guidedCard}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-        <div style={styles.dimLabel}>Exercise {progress}</div>
-        {completed && <span style={{ ...styles.badge, background: COLORS.green, color: COLORS.bg }}>Logged</span>}
-      </div>
+    <div className={`guided-exercise-stage guided-exercise-stage--${navigationDirection}`} key={ex.id || `${activeIndex}-${ex.n}`} style={styles.guidedExerciseStage} {...swipeHandlers}>
+      <div style={styles.guidedCard}>
+      <GuidedExerciseNavigation activeIndex={activeIndex} total={exercises.length} completed={completed} onNavigate={navigateToExercise} />
       <div style={styles.exTitle}>{titleCase(ex.n)}</div>
       <div style={styles.exPrescription}>{ex.ws} sets x {ex.r} reps{ex.rpe ? ` @ ${ex.rpe}` : ""}{loadMode === LOAD_MODES.BODYWEIGHT ? <span style={styles.dimLabel}> · bodyweight</span> : null}</div>
       {lastSession && <div style={styles.exLastLine}>last: {lastSession.sets.map((s) => formatStrengthSet(ex, s, "-")).join("  ")}</div>}
@@ -2016,11 +2037,46 @@ function GuidedWorkout({ plan, day, wkNum, exercises, activeIndex, setActiveInde
         <button style={{ ...styles.primaryButton, width: "100%", marginTop: 12 }} onClick={completeSet}>Complete {setKindLabel(current)} Set</button>
       </div>
 
-      <div style={{ display: "flex", gap: 8 }}>
-        <button style={styles.secondaryButton} disabled={activeIndex === 0} onClick={() => setActiveIndex(Math.max(0, activeIndex - 1))}>Previous exercise</button>
-        <button style={{ ...styles.secondaryButton, flex: 1 }} onClick={() => saveNow()}>Save Progress</button>
-        <button style={styles.secondaryButton} disabled={activeIndex >= exercises.length - 1} onClick={() => setActiveIndex(Math.min(exercises.length - 1, activeIndex + 1))}>Next exercise</button>
+      <div>
+        <button style={{ ...styles.secondaryButton, width: "100%" }} onClick={() => saveNow()}>Save Progress</button>
       </div>
+    </div>
+    </div>
+  );
+}
+
+function GuidedExerciseNavigation({ activeIndex, total, completed, onNavigate }) {
+  const isFirst = activeIndex === 0;
+  const isLast = activeIndex >= total - 1;
+  return (
+    <div style={styles.guidedNavigation} aria-label="Exercise navigation">
+      <button
+        type="button"
+        style={styles.guidedNavigationButton}
+        disabled={isFirst}
+        aria-label="Previous exercise"
+        title="Previous exercise"
+        onClick={() => onNavigate(activeIndex - 1)}
+      >
+        <ChevronLeft size={22} strokeWidth={2.4} />
+      </button>
+      <div style={styles.guidedNavigationStatus} aria-live="polite">
+        <div style={styles.guidedNavigationMeta}>
+          <span>Exercise {activeIndex + 1} of {total}</span>
+          {completed && <span style={{ ...styles.badge, background: COLORS.green, color: COLORS.bg }}>Logged</span>}
+        </div>
+        <div style={styles.guidedNavigationHint}>Swipe left or right to browse</div>
+      </div>
+      <button
+        type="button"
+        style={styles.guidedNavigationButton}
+        disabled={isLast}
+        aria-label="Next exercise"
+        title="Next exercise"
+        onClick={() => onNavigate(activeIndex + 1)}
+      >
+        <ChevronRight size={22} strokeWidth={2.4} />
+      </button>
     </div>
   );
 }
@@ -4373,6 +4429,12 @@ const styles = {
   quickKindBtnOn: { background: COLORS.amber, borderColor: COLORS.amber, color: COLORS.bg, fontWeight: 700 },
   quickMeasureForm: { display: "grid", gridTemplateColumns: "1fr 82px", gap: 8, marginTop: 8 },
   inlineMeasurePanel: { width: "100%", background: "rgba(13, 15, 18, 0.48)", border: `1px solid ${COLORS.cardBorder}`, borderRadius: 10, padding: 10, marginTop: 10 },
+  guidedExerciseStage: { overflow: "hidden", touchAction: "pan-y" },
+  guidedNavigation: { display: "grid", gridTemplateColumns: "44px minmax(0, 1fr) 44px", alignItems: "center", gap: 8, marginBottom: 2 },
+  guidedNavigationButton: { width: 44, height: 44, borderRadius: 12, border: `1px solid ${COLORS.cardBorder}`, background: "linear-gradient(180deg, rgba(255,255,255,0.065), rgba(255,255,255,0.02))", color: COLORS.amber, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)" },
+  guidedNavigationStatus: { minWidth: 0, textAlign: "center" },
+  guidedNavigationMeta: { minHeight: 20, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, color: COLORS.textDim, fontSize: 12, fontFamily: FONT_NUM },
+  guidedNavigationHint: { color: COLORS.textDim, fontSize: 11, marginTop: 1, opacity: 0.78 },
   inlineMeasureTitle: { fontSize: 11, color: COLORS.textDim, textTransform: "uppercase", letterSpacing: 0, marginBottom: 8, fontWeight: 700 },
   collapsibleHeader: { width: "100%", display: "grid", gridTemplateColumns: "1fr auto auto", gap: 8, alignItems: "center", background: "transparent", border: "none", color: COLORS.text, padding: 0, cursor: "pointer", fontFamily: FONT_BODY, fontSize: 15, fontWeight: 700, textAlign: "left" },
   collapsibleMeta: { color: COLORS.textDim, fontSize: 12, fontWeight: 600 },
