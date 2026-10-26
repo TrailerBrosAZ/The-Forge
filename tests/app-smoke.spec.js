@@ -179,6 +179,13 @@ test("recipe editor saves a batch and logs a portion", async ({ page }) => {
 
 test("food suggestions and spreadsheet export remain local", async ({ page }) => {
   await seed(page);
+  await page.addInitScript(() => {
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    localStorage.setItem("theforge:p:qa-profile:dayLog", JSON.stringify({
+      [today]: { breakfast: [{ id: "food-1", name: "Cottage Cheese", calories: 180, protein: 24, carbs: 8, fat: 5, servings: 1 }] },
+    }));
+  });
   await page.goto("./");
   await page.getByRole("button", { name: "Food", exact: true }).click();
   await page.getByRole("button", { name: "Add lunch" }).last().click();
