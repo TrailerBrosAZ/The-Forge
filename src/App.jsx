@@ -3800,7 +3800,7 @@ function BodyTab({ workoutLogs, plans, profile, setProfiles, weights, addWeightE
         </div>
       </div>}
 
-      {scanReview && <EvoltImportReview review={scanReview} setReview={setScanReview} busy={scanImporting} onCancel={() => setScanReview(null)} onConfirm={confirmScanImport} />}
+      {scanReview && <EvoltImportReview review={scanReview} setReview={setScanReview} busy={scanImporting} error={scanImportError} onCancel={() => setScanReview(null)} onConfirm={confirmScanImport} />}
     </div>
   );
 }
@@ -4096,6 +4096,7 @@ function MetricExplanation({ code }) {
 }
 
 function originalToCanonical(raw, metric) {
+  if (raw === "" || raw == null) return null;
   const value = Number(raw);
   if (!Number.isFinite(value)) return null;
   if (metric.originalUnit === "lb") return value / 2.2046226218;
@@ -4103,7 +4104,30 @@ function originalToCanonical(raw, metric) {
   return value;
 }
 
-function EvoltImportReview({ review, setReview, busy, onCancel, onConfirm }) {
+function EvoltImportReview({ review, setReview, busy, error, onCancel, onConfirm }) {
+  const overlayRef = useRef(null);
+  useEffect(() => {
+    const root = document.getElementById("root");
+    const wasInert = root?.inert;
+    const previousFocus = document.activeElement;
+    if (root) root.inert = true;
+    // Follow Safari's visible viewport when browser controls or the keyboard resize it.
+    const viewport = window.visualViewport;
+    const resize = () => {
+      if (!viewport || !overlayRef.current) return;
+      overlayRef.current.style.height = `${viewport.height}px`;
+      overlayRef.current.style.top = `${viewport.offsetTop}px`;
+    };
+    resize();
+    viewport?.addEventListener("resize", resize);
+    viewport?.addEventListener("scroll", resize);
+    return () => {
+      viewport?.removeEventListener("resize", resize);
+      viewport?.removeEventListener("scroll", resize);
+      if (root) root.inert = wasInert;
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+    };
+  }, []);
   const updateMetric = (code, rawValue) => setReview((current) => {
     const next = {
       ...current,
@@ -4118,32 +4142,37 @@ function EvoltImportReview({ review, setReview, busy, onCancel, onConfirm }) {
     const ai = priority.indexOf(a.code), bi = priority.indexOf(b.code);
     return (ai < 0 ? 100 : ai) - (bi < 0 ? 100 : bi);
   });
-  return (
-    <div style={{ ...styles.modalOverlay, zIndex: 90 }} role="dialog" aria-modal="true" aria-label="Review Evolt scan">
+  // Keep the review outside the animated tab's stacking context and page scroller.
+  return createPortal(
+    <div ref={overlayRef} style={styles.scanReviewOverlay} role="dialog" aria-modal="true" aria-label="Review Evolt scan">
       <div style={styles.scanReviewSheet}>
-        <div style={styles.modalHeader}>
+        <div style={{ ...styles.modalHeader, flexShrink: 0, gap: 10, marginBottom: 0 }}>
           <div><div style={styles.modalTitle}>Review Evolt Scan</div><div style={styles.dimLabel}>{review.scanDate} · {review.metrics.length} values recognized · {review.confidence} confidence</div></div>
-          <button style={styles.iconButton} onClick={onCancel} aria-label="Close scan review"><X size={18} /></button>
+          <button autoFocus style={styles.iconButton} onClick={onCancel} aria-label="Close scan review"><X size={18} color={COLORS.textDim} /></button>
         </div>
-        {review.warnings.length > 0 && <div style={styles.warningBanner}>Some consistency checks need review. Confirm the highlighted values against the PDF.</div>}
-        <div style={styles.scanReviewList}>
-          {ordered.map((metric) => (
-            <label key={metric.code} style={styles.scanReviewRow}>
-              <span><strong>{metric.label}</strong><small>{metric.status || metric.region?.replace("_", " ") || "recognized"}</small></span>
-              <span style={styles.scanReviewInputWrap}>
-                <input type="number" step="0.01" value={metric.originalValue} onChange={(event) => updateMetric(metric.code, event.target.value)} style={styles.scanReviewInput} />
-                <em>{metric.originalUnit}</em>
-              </span>
-            </label>
-          ))}
+        <div style={styles.scanReviewBody} role="region" aria-label="Scan values" tabIndex={0}>
+          {review.warnings.length > 0 && <div style={styles.warningBanner}>Some consistency checks need review. Confirm the highlighted values against the PDF.</div>}
+          <div style={styles.scanReviewList}>
+            {ordered.map((metric) => (
+              <label key={metric.code} style={styles.scanReviewRow}>
+                <span style={{ minWidth: 0, overflowWrap: "anywhere" }}><strong>{metric.label}</strong><small style={{ ...styles.dimLabel, display: "block", marginTop: 3 }}>{metric.status || metric.region?.replace("_", " ") || "recognized"}</small></span>
+                <span style={styles.scanReviewInputWrap}>
+                  <input aria-label={metric.label} type="number" step="0.01" value={metric.originalValue} onChange={(event) => updateMetric(metric.code, event.target.value)} style={styles.scanReviewInput} />
+                  <em>{metric.originalUnit}</em>
+                </span>
+              </label>
+            ))}
+          </div>
+          <div style={styles.helpNote}>The original PDF stays on this device. Imported values can be corrected here before they affect your history.</div>
         </div>
-        <div style={styles.helpNote}>The original PDF stays on this device. Imported values can be corrected here before they affect your history.</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: 8 }}>
+        <div style={styles.scanReviewFooter}>
+          {error && <div role="alert" style={{ ...styles.warningBanner, gridColumn: "1 / -1", margin: 0 }}>{error}</div>}
           <button style={styles.secondaryButton} disabled={busy} onClick={onCancel}>Cancel</button>
-          <button style={styles.primaryButton} disabled={busy} onClick={() => onConfirm(review)}>{busy ? "Saving…" : "Import Scan"}</button>
+          <button style={styles.primaryButton} disabled={busy} onClick={() => onConfirm(review)}>{busy ? "Saving…" : "Confirm Import"}</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -4284,9 +4313,12 @@ const styles = {
   scanChangeGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12 },
   scanChangeTile: { display: "flex", flexDirection: "column", gap: 5, padding: 10, background: "rgba(255,255,255,.025)", border: `1px solid ${COLORS.cardBorder}`, borderRadius: 9 },
   scanHistoryRow: { display: "flex", alignItems: "center", gap: 6, padding: "10px 0", borderTop: `1px solid ${COLORS.cardBorder}` },
-  scanReviewSheet: { background: `linear-gradient(180deg, ${COLORS.cardHi}, ${COLORS.card})`, border: "1px solid rgba(255,255,255,.1)", borderBottom: "none", borderRadius: "18px 18px 0 0", padding: "18px 16px 20px", width: "100%", maxWidth: 480, margin: "0 auto", maxHeight: "calc(100dvh - 94px)", display: "flex", flexDirection: "column", gap: 10, boxShadow: "0 -24px 70px rgba(0,0,0,.62)" },
-  scanReviewList: { overflowY: "auto", minHeight: 0, paddingRight: 2, borderTop: `1px solid ${COLORS.cardBorder}` },
-  scanReviewRow: { display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: `1px solid ${COLORS.cardBorder}`, fontSize: 12 },
+  scanReviewOverlay: { position: "fixed", inset: 0, height: "100dvh", padding: "calc(12px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left))", background: "rgba(0,0,0,.78)", display: "grid", placeItems: "center", overflow: "hidden", zIndex: 1000, color: COLORS.text, fontFamily: FONT_BODY },
+  scanReviewSheet: { background: `linear-gradient(180deg, ${COLORS.cardHi}, ${COLORS.card})`, border: "1px solid rgba(255,255,255,.1)", borderRadius: 18, padding: "18px 16px 0", width: "100%", maxWidth: 480, height: "100%", maxHeight: 760, minHeight: 0, overflow: "hidden", display: "grid", gridTemplateRows: "auto minmax(0, 1fr) auto", gap: 10, boxShadow: "0 24px 70px rgba(0,0,0,.62)" },
+  scanReviewBody: { flex: "1 1 auto", minHeight: 0, overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch", overscrollBehaviorY: "contain", touchAction: "pan-y pinch-zoom", paddingRight: 2 },
+  scanReviewList: { borderTop: `1px solid ${COLORS.cardBorder}` },
+  scanReviewFooter: { display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: 8, borderTop: `1px solid ${COLORS.cardBorder}`, padding: "12px 0 16px" },
+  scanReviewRow: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: `1px solid ${COLORS.cardBorder}`, fontSize: 12 },
   scanReviewInputWrap: { display: "flex", alignItems: "center", gap: 5 },
   scanReviewInput: { width: 78, background: COLORS.bg, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 7, padding: "7px 6px", color: COLORS.text, fontFamily: FONT_NUM, textAlign: "right" },
   modalHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
